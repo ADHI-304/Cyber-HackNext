@@ -1,0 +1,78 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --font-scale: 1;
+  --focus-ring-color: #0284c7;
+}
+
+/* Accessible Font Sizes */
+html.text-size-sm { font-size: 14px; }
+html.text-size-base { font-size: 16px; }
+html.text-size-lg { font-size: 18px; }
+html.text-size-xl { font-size: 20px; }
+
+/* High Contrast Mode Overrides */
+html.high-contrast {
+  --focus-ring-color: #fbbf24;
+}
+
+html.high-contrast body {
+  background-color: #0f172a !important;
+  color: #ffffff !important;
+}
+
+html.high-contrast .bg-white,
+html.high-contrast .bg-slate-50,
+html.high-contrast .bg-slate-100 {
+  background-color: #1e293b !important;
+  color: #ffffff !important;
+  border-color: #334155 !important;
+}
+
+html.high-contrast .text-slate-600,
+html.high-contrast .text-slate-500,
+html.high-contrast .text-slate-700 {
+  color: #e2e8f0 !important;
+}
+
+html.high-contrast button:focus-visible,
+html.high-contrast input:focus-visible,
+html.high-contrast a:focus-visible {
+  outline: 4px solid #fbbf24 !important;
+  outline-offset: 2px !important;
+}
+
+/* Reduced Motion Mode */
+html.reduced-motion *,
+html.reduced-motion *::before,
+html.reduced-motion *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
+}
+
+/* Touch targets & focus accessibility */
+button, input, select, a {
+  min-height: 44px;
+}
+
+*:focus-visible {
+  outline: 3px solid var(--focus-ring-color);
+  outline-offset: 2px;
+}
+
+/* Screen reader utility */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
