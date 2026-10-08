@@ -377,6 +377,75 @@ export async function approveRecovery(recoveryId, contactIndex, decision = 'appr
   };
 }
 
+export async function requestPhoneRecoveryOtp(username = 'user@securebank.com', phone = '+91 ******1234') {
+  if (USE_REAL_BACKEND) {
+    const res = await apiFetch('/api/v1/recovery/request-phone-otp', {
+      method: 'POST',
+      body: JSON.stringify({ username, phone })
+    });
+    if (res) return res;
+  }
+  await delay(300);
+  return { ok: true, success: true, message: `OTP sent to ${phone}`, data: { demoCodeHint: '123456' } };
+}
+
+export async function verifyPhoneRecoveryOtp(username = 'user@securebank.com', code) {
+  if (USE_REAL_BACKEND) {
+    const res = await apiFetch('/api/v1/recovery/verify-phone-otp', {
+      method: 'POST',
+      body: JSON.stringify({ username, code })
+    });
+    if (res) return res;
+  }
+  await delay(300);
+  if (code === '123456' || code.length === 6) {
+    return { ok: true, success: true, message: 'Phone verification successful' };
+  }
+  return { ok: false, errorCode: 'OTP_INVALID', message: 'Invalid phone OTP' };
+}
+
+export async function requestEmailRecoveryOtp(email) {
+  if (USE_REAL_BACKEND) {
+    const res = await apiFetch('/api/v1/recovery/request-email-otp', {
+      method: 'POST',
+      body: JSON.stringify({ email })
+    });
+    if (res) return res;
+  }
+  await delay(300);
+  return { ok: true, success: true, message: `Recovery link sent to ${email}`, data: { demoCodeHint: '123456' } };
+}
+
+export async function verifyEmailRecoveryOtp(email, code) {
+  if (USE_REAL_BACKEND) {
+    const res = await apiFetch('/api/v1/recovery/verify-email-otp', {
+      method: 'POST',
+      body: JSON.stringify({ email, code })
+    });
+    if (res) return res;
+  }
+  await delay(300);
+  if (code === '123456' || code.length === 6) {
+    return { ok: true, success: true, message: 'Email recovery verified' };
+  }
+  return { ok: false, errorCode: 'OTP_INVALID', message: 'Invalid email recovery code' };
+}
+
+export async function verifyTotpRecovery(username = 'user@securebank.com', code) {
+  if (USE_REAL_BACKEND) {
+    const res = await apiFetch('/api/v1/recovery/verify-totp', {
+      method: 'POST',
+      body: JSON.stringify({ username, code })
+    });
+    if (res) return res;
+  }
+  await delay(300);
+  if (code === '123456' || code.length === 6) {
+    return { ok: true, success: true, message: 'TOTP verified' };
+  }
+  return { ok: false, errorCode: 'OTP_INVALID', message: 'Invalid TOTP code' };
+}
+
 export async function logEvent(eventType, metadata = {}) {
   if (USE_REAL_BACKEND) {
     const res = await apiFetch('/api/v1/telemetry/events', {

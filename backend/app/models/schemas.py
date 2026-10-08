@@ -84,3 +84,23 @@ class LogEventRequest(BaseModel):
     type: str
     step: Optional[str] = 'General'
     metadata: Optional[Dict[str, Any]] = Field(default_factory=dict)
+
+class PhoneRecoveryRequest(BaseModel):
+    username: Optional[str] = 'user@securebank.com'
+    phone: Optional[str] = '+91 ******1234'
+
+class VerifyPhoneRecoveryRequest(BaseModel):
+    username: Optional[str] = 'user@securebank.com'
+    code: str
+
+class EmailRecoveryRequest(BaseModel):
+    email: str
+
+class VerifyEmailRecoveryRequest(BaseModel):
+    email: str
+    code: str
+
+class VerifyTotpRecoveryRequest(BaseModel):
+    username: Optional[str] = 'user@securebank.com'
+    code: str
+

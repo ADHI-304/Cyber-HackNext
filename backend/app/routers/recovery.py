@@ -1,9 +1,25 @@
 import time
 import random
 import string
-from fastapi import APIRouter
-from app.models.schemas import ApiResponse, StartRecoveryRequest, ApproveRecoveryRequest
-from app.services.store import recovery_sessions, mock_users, log_telemetry_event
+from fastapi import APIRouter, BackgroundTasks
+from app.models.schemas import (
+    ApiResponse,
+    StartRecoveryRequest,
+    ApproveRecoveryRequest,
+    PhoneRecoveryRequest,
+    VerifyPhoneRecoveryRequest,
+    EmailRecoveryRequest,
+    VerifyEmailRecoveryRequest,
+    VerifyTotpRecoveryRequest
+)
+from app.services.store import (
+    recovery_sessions,
+    mock_users,
+    active_otps,
+    email_verification_otps,
+    generate_and_send_email_otp,
+    log_telemetry_event
+)
 
 router = APIRouter(prefix="/api/v1/recovery", tags=["Account Recovery"])
 
@@ -34,6 +50,110 @@ def get_user_preregistered_contacts(username: str) -> list:
             'status': 'pending'
         })
     return session_contacts
+
+@router.post("/request-phone-otp", response_model=ApiResponse[dict])
+async def request_phone_recovery_otp(body: PhoneRecoveryRequest):
+    phone = body.phone or "+91 ******1234"
+    username = (body.username or "user@securebank.com").lower().strip()
+    
+    code = "123456"
+    active_otps[username] = {"code": code, "expiresAt": time.time() + 300}
+    
+    log_telemetry_event("PHONE_RECOVERY_OTP_SENT", step="Recovery", metadata={"username": username, "phone": phone})
+    print(f"\n=======================================================")
+    print(f"[PHONE RECOVERY OTP] Username: {username} | Phone: {phone} | Code: {code}")
+    print(f"=======================================================\n")
+    
+    return ApiResponse(
+        ok=True,
+        errorCode=None,
+        data={
+            "message": f"6-digit verification code sent to registered phone {phone}",
+            "demoCodeHint": "123456"
+        }
+    )
+
+@router.post("/verify-phone-otp", response_model=ApiResponse[dict])
+async def verify_phone_recovery_otp(body: VerifyPhoneRecoveryRequest):
+    username = (body.username or "user@securebank.com").lower().strip()
+    code = body.code.strip()
+    
+    otp_data = active_otps.get(username)
+    if code == "123456" or (otp_data and otp_data["code"] == code):
+        if username in active_otps:
+            del active_otps[username]
+        log_telemetry_event("PHONE_RECOVERY_SUCCESS", step="Recovery", metadata={"username": username})
+        return ApiResponse(
+            ok=True,
+            errorCode=None,
+            data={"success": True, "message": "Phone verification successful. You can now reset your password."}
+        )
+    
+    return ApiResponse(
+        ok=False,
+        errorCode="OTP_INVALID",
+        data={"success": False, "message": "The phone verification code is incorrect."}
+    )
+
+@router.post("/request-email-otp", response_model=ApiResponse[dict])
+async def request_email_recovery_otp(body: EmailRecoveryRequest, background_tasks: BackgroundTasks):
+    email = body.email.lower().strip()
+    
+    background_tasks.add_task(generate_and_send_email_otp, email, "PASSWORD_RESET")
+    log_telemetry_event("EMAIL_RECOVERY_OTP_SENT", step="Recovery", metadata={"email": email})
+    
+    return ApiResponse(
+        ok=True,
+        errorCode=None,
+        data={
+            "message": f"Recovery code/link sent to {email}",
+            "demoCodeHint": "123456"
+        }
+    )
+
+@router.post("/verify-email-otp", response_model=ApiResponse[dict])
+async def verify_email_recovery_otp(body: VerifyEmailRecoveryRequest):
+    email = body.email.lower().strip()
+    code = body.code.strip()
+    
+    otp_key = f"{email}:PASSWORD_RESET"
+    rec = email_verification_otps.get(otp_key)
+    
+    if code == "123456" or (rec and not rec.get("used")):
+        if rec:
+            rec["used"] = True
+            email_verification_otps.pop(otp_key, None)
+        log_telemetry_event("EMAIL_RECOVERY_SUCCESS", step="Recovery", metadata={"email": email})
+        return ApiResponse(
+            ok=True,
+            errorCode=None,
+            data={"success": True, "message": "Email recovery verification successful."}
+        )
+    
+    return ApiResponse(
+        ok=False,
+        errorCode="OTP_INVALID",
+        data={"success": False, "message": "The recovery email code is incorrect or expired."}
+    )
+
+@router.post("/verify-totp", response_model=ApiResponse[dict])
+async def verify_totp_recovery(body: VerifyTotpRecoveryRequest):
+    username = (body.username or "user@securebank.com").lower().strip()
+    code = body.code.strip()
+    
+    if len(code) == 6 and (code == "123456" or code.isdigit()):
+        log_telemetry_event("TOTP_RECOVERY_SUCCESS", step="Recovery", metadata={"username": username})
+        return ApiResponse(
+            ok=True,
+            errorCode=None,
+            data={"success": True, "message": "Authenticator TOTP code verified successfully."}
+        )
+    
+    return ApiResponse(
+        ok=False,
+        errorCode="OTP_INVALID",
+        data={"success": False, "message": "Invalid 6-digit authenticator TOTP code."}
+    )
 
 @router.post("/start", response_model=ApiResponse[dict])
 async def start_recovery_session(body: StartRecoveryRequest):
