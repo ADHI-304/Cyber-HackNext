@@ -71,13 +71,35 @@ The **AdminFriction** dashboard displays real-time telemetry:
 
 ## 🛠️ Setup & Running
 
+### 1. Python FastAPI Backend (`/backend`)
 ```bash
-# Install dependencies
-npm install
+cd backend
 
-# Start local dev server
-npm run dev
+# Create virtual environment (Python 3.10+)
+python -m venv venv
 
-# Production build
-npm run build
+# Activate virtual environment
+# On Windows PowerShell:
+.\venv\Scripts\Activate.ps1
+# On Linux / macOS / Git Bash:
+# source venv/bin/activate
+
+# Install dependencies into virtual environment
+pip install -r requirements.txt
+
+# Start FastAPI dev server
+python -m uvicorn app.main:app --host 0.0.0.0 --port 5000 --reload
 ```
+- API Documentation: `http://localhost:5000/docs`
+- Run Backend Test Suite: `.\venv\Scripts\python.exe -c "from tests.test_api import test_health_check, test_user_registration, test_login_flow, test_verify_otp, test_recovery_flow, test_telemetry_and_friction_stats; test_health_check(); test_user_registration(); test_login_flow(); test_verify_otp(); test_recovery_flow(); test_telemetry_and_friction_stats(); print('ALL TESTS PASSED!')"`
+
+### 2. React + Vite Frontend (`/frontend`)
+```bash
+cd frontend
+npm install
+npm run dev
+```
+- Open in Browser: `http://localhost:3000`
+- Seamlessly connects to FastAPI backend at `http://localhost:5000` (with automatic fallback to mock API if backend is offline).
+- Production Build: `npm run build`
+

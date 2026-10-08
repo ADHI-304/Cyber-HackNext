@@ -82,12 +82,12 @@ export function RecoveryStart() {
 
               <div className="space-y-2">
                 <h2 className="text-xs font-bold text-slate-900 high-contrast:text-amber-400 flex items-center justify-between">
-                  <span>Your 3 Trusted Contacts</span>
-                  <span className="text-[11px] text-slate-500 font-normal">2 of 3 must approve</span>
+                  <span>Pre-Registered Trusted Contacts</span>
+                  <span className="text-[11px] font-semibold text-purple-700">Contact 1 Mandatory</span>
                 </h2>
 
                 {contacts.map((c, index) => (
-                  <ContactCard key={index} index={index} name={c.name} email={c.email} isEditable={true} onChange={handleContactChange} />
+                  <ContactCard key={index} index={index} name={c.name} email={c.email} isEditable={false} />
                 ))}
               </div>
 

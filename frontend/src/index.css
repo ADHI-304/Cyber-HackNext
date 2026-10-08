@@ -44,15 +44,6 @@ html.high-contrast a:focus-visible {
   outline-offset: 2px !important;
 }
 
-/* Reduced Motion Mode */
-html.reduced-motion *,
-html.reduced-motion *::before,
-html.reduced-motion *::after {
-  animation-duration: 0.01ms !important;
-  animation-iteration-count: 1 !important;
-  transition-duration: 0.01ms !important;
-  scroll-behavior: auto !important;
-}
 
 /* Touch targets & focus accessibility */
 button, input, select, a {

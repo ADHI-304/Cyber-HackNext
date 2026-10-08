@@ -1,6 +1,6 @@
 import React from 'react';
 
-export function RecoveryProgressCards({ approvedCount, isApprovedRequired, timerSeconds, isTimerFinished }) {
+export function RecoveryProgressCards({ approvedCount, requiredCount = 2, isApprovedRequired, timerSeconds, isTimerFinished }) {
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
       {/* Approvals Counter Card */}
@@ -9,7 +9,7 @@ export function RecoveryProgressCards({ approvedCount, isApprovedRequired, timer
           Contact Approvals
         </span>
         <div className="text-3xl font-extrabold text-purple-700 high-contrast:text-amber-400">
-          {approvedCount} / 2
+          {approvedCount} / {requiredCount}
         </div>
         <p className="text-xs text-slate-600 font-medium">
           {isApprovedRequired ? 'Requirement Satisfied!' : 'Waiting for trusted friends'}

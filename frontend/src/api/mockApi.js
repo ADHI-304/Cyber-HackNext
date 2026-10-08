@@ -1,21 +1,10 @@
 /**
- * MOCK API LAYER FOR AUTHBUDDY
- * -------------------------------------------------------------
- * Endpoint Mapping Reference for Future Production Integration:
- * 
- * Function              -> Real Backend Endpoint           -> HTTP Method
- * -----------------------------------------------------------------------
- * register()            -> /api/v1/auth/register           -> POST
- * login()               -> /api/v1/auth/login              -> POST
- * verifyOtp()           -> /api/v1/auth/verify-otp         -> POST
- * resendOtp()           -> /api/v1/auth/resend-otp         -> POST
- * startRecovery()       -> /api/v1/recovery/start          -> POST
- * getRecoveryStatus()   -> /api/v1/recovery/status/:id     -> GET
- * approveRecovery()     -> /api/v1/recovery/approve        -> POST
- * getFrictionStats()    -> /api/v1/admin/friction-stats    -> GET
- * logEvent()            -> /api/v1/telemetry/events        -> POST
- * -------------------------------------------------------------
+ * API LAYER FOR AUTHBUDDY
+ * Configured to seamlessly switch between local mock data and Python FastAPI backend (http://localhost:5000).
  */
+
+const USE_REAL_BACKEND = true; // Connected directly to FastAPI backend on port 5000 (with automatic mock fallback)
+const BACKEND_URL = 'http://localhost:5000';
 
 const delay = (ms = 350) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -36,7 +25,28 @@ let loggedEvents = [
   { id: 4, type: 'SECURE_RECOVERY_STARTED', step: 'Recovery', timestamp: new Date(Date.now() - 900000).toISOString(), metadata: { contactsCount: 3 } },
 ];
 
-export async function register(username, password, accessibilityProfile = {}) {
+async function apiFetch(endpoint, options = {}) {
+  try {
+    const res = await fetch(`${BACKEND_URL}${endpoint}`, {
+      headers: { 'Content-Type': 'application/json', ...(options.headers || {}) },
+      ...options
+    });
+    return await res.json();
+  } catch (e) {
+    console.warn(`Backend fetch failed for ${endpoint}, falling back to mock mode`, e);
+    return null;
+  }
+}
+
+export async function register(username, password, accessibilityProfile = {}, trustedContacts = []) {
+  if (USE_REAL_BACKEND) {
+    const res = await apiFetch('/api/v1/auth/register', {
+      method: 'POST',
+      body: JSON.stringify({ username, password, accessibilityProfile, trustedContacts })
+    });
+    if (res) return res;
+  }
+
   await delay(400);
 
   if (!username || !password) {
@@ -47,13 +57,14 @@ export async function register(username, password, accessibilityProfile = {}) {
     return { ok: false, errorCode: 'WEAK_PASSWORD', data: null };
   }
 
-  mockUsers.set(username, { username, password, accessibilityProfile });
+  mockUsers.set(username, { username, password, accessibilityProfile, trustedContacts });
 
   return {
     ok: true,
     errorCode: null,
     data: {
       username,
+      trustedContacts,
       qrPlaceholderUrl: `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=otpauth://totp/SecureBank:${encodeURIComponent(username)}?secret=JBSWY3DPEHPK3PXP&issuer=SecureBank`,
       secretKey: 'JBSWY3DPEHPK3PXP',
       message: 'Account created successfully'
@@ -61,7 +72,84 @@ export async function register(username, password, accessibilityProfile = {}) {
   };
 }
 
+export async function verifyTrustedContact(username, contactEmail, code = null) {
+  if (USE_REAL_BACKEND) {
+    const res = await apiFetch('/api/v1/auth/verify-trusted-contact', {
+      method: 'POST',
+      body: JSON.stringify({ username, contactEmail, code })
+    });
+    if (res) return res;
+  }
+
+  await delay(300);
+  const user = mockUsers.get(username);
+  if (user && user.trustedContacts) {
+    user.trustedContacts.forEach(c => {
+      if (c.email.toLowerCase() === contactEmail.toLowerCase()) {
+        c.status = 'active';
+      }
+    });
+  }
+  return { ok: true, success: true, message: `Trusted contact ${contactEmail} verified` };
+}
+
+export async function resendContactOtp(email) {
+  if (USE_REAL_BACKEND) {
+    const res = await apiFetch('/api/v1/auth/resend-contact-otp', {
+      method: 'POST',
+      body: JSON.stringify({ email })
+    });
+    if (res) return res;
+  }
+
+  await delay(300);
+  return { ok: true, success: true, message: `Fresh code sent to ${email}` };
+}
+
+export async function acceptTrustedContactStart(contactEmail, invitationCode) {
+  if (USE_REAL_BACKEND) {
+    const res = await apiFetch('/api/v1/auth/accept-trusted-contact/start', {
+      method: 'POST',
+      body: JSON.stringify({ contactEmail, invitationCode })
+    });
+    if (res) return res;
+  }
+
+  await delay(300);
+  return {
+    ok: true,
+    success: true,
+    message: `Invitation code validated! A 6-digit verification code was sent to ${contactEmail}.`,
+    data: { contactEmail, otpRequired: true }
+  };
+}
+
+export async function acceptTrustedContactConfirm(contactEmail, invitationCode, otp) {
+  if (USE_REAL_BACKEND) {
+    const res = await apiFetch('/api/v1/auth/accept-trusted-contact/confirm', {
+      method: 'POST',
+      body: JSON.stringify({ contactEmail, invitationCode, otp })
+    });
+    if (res) return res;
+  }
+
+  await delay(300);
+  return {
+    ok: true,
+    success: true,
+    message: 'Success! You are now an active pre-registered trusted contact.'
+  };
+}
+
 export async function login(username, password) {
+  if (USE_REAL_BACKEND) {
+    const res = await apiFetch('/api/v1/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ username, password })
+    });
+    if (res) return res;
+  }
+
   await delay(400);
 
   const now = Date.now();
@@ -110,6 +198,14 @@ export async function login(username, password) {
 }
 
 export async function verifyOtp(username, code) {
+  if (USE_REAL_BACKEND) {
+    const res = await apiFetch('/api/v1/auth/verify-otp', {
+      method: 'POST',
+      body: JSON.stringify({ username, code })
+    });
+    if (res) return res;
+  }
+
   await delay(350);
 
   const otpData = activeOtps.get(username);
@@ -146,6 +242,14 @@ export async function verifyOtp(username, code) {
 }
 
 export async function resendOtp(username) {
+  if (USE_REAL_BACKEND) {
+    const res = await apiFetch('/api/v1/auth/resend-otp', {
+      method: 'POST',
+      body: JSON.stringify({ username })
+    });
+    if (res) return res;
+  }
+
   await delay(300);
 
   const code = '123456';
@@ -166,6 +270,14 @@ export async function resendOtp(username) {
 }
 
 export async function startRecovery(username, contacts) {
+  if (USE_REAL_BACKEND) {
+    const res = await apiFetch('/api/v1/recovery/start', {
+      method: 'POST',
+      body: JSON.stringify({ username, contacts })
+    });
+    if (res) return res;
+  }
+
   await delay(450);
 
   const recoveryId = 'rec_' + Math.random().toString(36).substr(2, 9);
@@ -194,6 +306,11 @@ export async function startRecovery(username, contacts) {
 }
 
 export async function getRecoveryStatus(recoveryId) {
+  if (USE_REAL_BACKEND) {
+    const res = await apiFetch(`/api/v1/recovery/status/${recoveryId}`, { method: 'GET' });
+    if (res) return res;
+  }
+
   await delay(150);
 
   const session = recoverySessions.get(recoveryId);
@@ -226,6 +343,14 @@ export async function getRecoveryStatus(recoveryId) {
 }
 
 export async function approveRecovery(recoveryId, contactIndex, decision = 'approved') {
+  if (USE_REAL_BACKEND) {
+    const res = await apiFetch('/api/v1/recovery/approve', {
+      method: 'POST',
+      body: JSON.stringify({ recoveryId, contactIndex, decision })
+    });
+    if (res) return res;
+  }
+
   await delay(350);
 
   const session = recoverySessions.get(recoveryId);
@@ -253,6 +378,14 @@ export async function approveRecovery(recoveryId, contactIndex, decision = 'appr
 }
 
 export async function logEvent(eventType, metadata = {}) {
+  if (USE_REAL_BACKEND) {
+    const res = await apiFetch('/api/v1/telemetry/events', {
+      method: 'POST',
+      body: JSON.stringify({ type: eventType, step: metadata.step || 'General', metadata })
+    });
+    if (res) return res;
+  }
+
   const newEvent = {
     id: loggedEvents.length + 1,
     type: eventType,
@@ -265,6 +398,11 @@ export async function logEvent(eventType, metadata = {}) {
 }
 
 export async function getFrictionStats() {
+  if (USE_REAL_BACKEND) {
+    const res = await apiFetch('/api/v1/admin/friction-stats', { method: 'GET' });
+    if (res) return res;
+  }
+
   await delay(250);
 
   return {

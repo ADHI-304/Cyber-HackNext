@@ -1,6 +1,6 @@
 import React from 'react';
 import { useA11yPrefs } from '../context/A11yContext';
-import { Type, Eye, Volume2, Activity, RotateCcw } from 'lucide-react';
+import { Type, Eye, Volume2, RotateCcw } from 'lucide-react';
 
 export function AccessibilityBar() {
   const {
@@ -8,7 +8,6 @@ export function AccessibilityBar() {
     setTextSize,
     toggleHighContrast,
     toggleVoiceGuidance,
-    toggleReducedMotion,
     resetA11yPrefs
   } = useA11yPrefs();
 
@@ -97,22 +96,6 @@ export function AccessibilityBar() {
           >
             <Volume2 className="w-4 h-4" aria-hidden="true" />
             <span>Voice Guidance {prefs.voiceGuidance ? '(On)' : ''}</span>
-          </button>
-
-          {/* Reduced Motion Toggle */}
-          <button
-            type="button"
-            onClick={toggleReducedMotion}
-            className={`min-h-[44px] min-w-[44px] px-3 py-1.5 text-xs font-medium rounded-lg border flex items-center gap-1.5 transition-colors ${
-              prefs.reducedMotion
-                ? 'bg-amber-400 text-slate-950 border-amber-300 font-bold'
-                : 'bg-slate-800 text-slate-200 border-slate-700 hover:bg-slate-700'
-            }`}
-            aria-pressed={prefs.reducedMotion}
-            aria-label="Toggle Reduced Motion"
-          >
-            <Activity className="w-4 h-4" aria-hidden="true" />
-            <span>Reduced Motion {prefs.reducedMotion ? '(On)' : ''}</span>
           </button>
 
           {/* Reset Button */}

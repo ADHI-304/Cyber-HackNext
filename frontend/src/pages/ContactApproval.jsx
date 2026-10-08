@@ -1,89 +1,120 @@
-import React, { useState, useEffect } from 'react';
-import { useSearchParams } from 'react-router-dom';
-import { getRecoveryStatus, approveRecovery } from '../api/mockApi';
+import React, { useState } from 'react';
+import { acceptTrustedContactStart, acceptTrustedContactConfirm } from '../api/mockApi';
 import { AuthBuddyGuidance } from '../components/AuthBuddyGuidance';
-import { UserCheck, CheckCircle2, XCircle, PhoneCall } from 'lucide-react';
+import { ShieldCheck, CheckCircle2, ArrowRight, KeyRound, Mail } from 'lucide-react';
 
 export function ContactApproval() {
-  const [searchParams] = useSearchParams();
-  const recoveryId = searchParams.get('id') || 'rec_demo';
-  const contactIndex = parseInt(searchParams.get('contact') || '0', 10);
-
-  const [session, setSession] = useState(null);
-  const [status, setStatus] = useState('idle');
+  const [step, setStep] = useState('CODE_ENTRY'); // 'CODE_ENTRY' | 'OTP_ENTRY' | 'ACTIVE_SUCCESS'
+  const [contactEmail, setContactEmail] = useState('');
+  const [invitationCode, setInvitationCode] = useState('');
+  const [otp, setOtp] = useState('');
+  const [targetUsername, setTargetUsername] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState(null);
 
-  useEffect(() => {
-    getRecoveryStatus(recoveryId).then(res => {
-      if (res.ok) {
-        setSession(res.data);
-      }
-    });
-  }, [recoveryId]);
-
-  const handleAction = async (decision) => {
+  const handleValidateCode = async (e) => {
+    e.preventDefault();
+    setErrorMsg(null);
+    if (!contactEmail || !invitationCode) {
+      setErrorMsg('Please enter both your email address and the invitation code.');
+      return;
+    }
     setIsLoading(true);
-    const res = await approveRecovery(recoveryId, contactIndex, decision);
+    const res = await acceptTrustedContactStart(contactEmail, invitationCode);
     setIsLoading(false);
-    if (res.ok) {
-      setStatus(decision);
+    if (!res.ok && !res.success) {
+      setErrorMsg(res.message || 'Invalid or expired invitation code.');
+    } else {
+      setTargetUsername(res.data?.username || 'User');
+      setStep('OTP_ENTRY');
     }
   };
 
-  const contactName = session?.contacts?.[contactIndex]?.name || 'Trusted Friend';
-  const username = session?.username || 'user@securebank.com';
+  const handleConfirmOtp = async (e) => {
+    e.preventDefault();
+    setErrorMsg(null);
+    if (!otp) {
+      setErrorMsg('Please enter the 6-digit verification code.');
+      return;
+    }
+    setIsLoading(true);
+    const res = await acceptTrustedContactConfirm(contactEmail, invitationCode, otp);
+    setIsLoading(false);
+    if (!res.ok && !res.success) {
+      setErrorMsg(res.message || 'The verification code is incorrect or expired.');
+    } else {
+      setStep('ACTIVE_SUCCESS');
+    }
+  };
 
   return (
     <main id="main-content" className="min-h-[85vh] py-8 px-4 max-w-lg mx-auto flex flex-col items-center justify-center">
       <div className="w-full">
-        {/* AuthBuddy Contextual Guidance */}
         <AuthBuddyGuidance guidanceKey="CONTACT_APPROVAL" />
-
         <div className="bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 shadow-xl text-center space-y-6 high-contrast:bg-slate-900 high-contrast:border-amber-400">
-          <div className="mx-auto w-14 h-14 bg-sky-100 text-sky-700 rounded-2xl flex items-center justify-center shadow-inner high-contrast:bg-amber-400 high-contrast:text-slate-950">
-            <UserCheck className="w-7 h-7" />
+          <div className="mx-auto w-14 h-14 bg-purple-100 text-purple-700 rounded-2xl flex items-center justify-center shadow-inner high-contrast:bg-amber-400 high-contrast:text-slate-950">
+            <ShieldCheck className="w-7 h-7" />
           </div>
 
           <h1 className="text-2xl font-extrabold text-slate-900 high-contrast:text-white">
-            Trusted Contact Verification
+            Accept Trusted Contact Invitation
           </h1>
 
-          <div className="bg-sky-50 border border-sky-200 rounded-2xl p-4 text-left space-y-2 high-contrast:bg-slate-800 high-contrast:border-slate-700">
-            <p className="text-sm font-medium text-slate-800 high-contrast:text-slate-200 leading-relaxed">
-              Hello <strong>{contactName}</strong>, your friend <strong className="text-sky-700 high-contrast:text-amber-400">{username}</strong> requested your help to recover access to their SecureBank account.
-            </p>
-          </div>
+          {errorMsg && (
+            <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs font-bold rounded-xl">
+              {errorMsg}
+            </div>
+          )}
 
-          <div className="bg-amber-50 border border-amber-300 rounded-2xl p-4 text-left flex items-start gap-3 high-contrast:bg-slate-800 high-contrast:border-amber-400">
-            <PhoneCall className="w-5 h-5 text-amber-700 shrink-0 mt-0.5" />
-            <div className="text-xs text-amber-950 high-contrast:text-amber-200 space-y-1">
-              <strong className="block font-bold">Important Security Step:</strong>
-              <p>Only click "Approve" if you have personally verified with {username} via a phone call or in-person conversation.</p>
-            </div>
-          </div>
+          {step === 'CODE_ENTRY' ? (
+            <form onSubmit={handleValidateCode} className="space-y-4 text-left">
+              <p className="text-xs text-slate-600 font-medium text-center">
+                Enter your invitation code received via email to accept becoming a trusted recovery contact.
+              </p>
+              <div>
+                <label className="block text-xs font-bold text-slate-800 mb-1">Your Email Address</label>
+                <div className="relative">
+                  <input type="email" required value={contactEmail} onChange={(e) => setContactEmail(e.target.value)} placeholder="you@example.com" className="w-full min-h-[44px] px-3 pl-9 rounded-xl border border-slate-300 text-xs font-semibold focus:ring-2 focus:ring-purple-500" />
+                  <Mail className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                </div>
+              </div>
 
-          {status === 'approved' ? (
-            <div className="bg-emerald-50 border border-emerald-300 text-emerald-900 p-5 rounded-2xl space-y-2 text-center" role="status">
-              <CheckCircle2 className="w-10 h-10 text-emerald-600 mx-auto" />
-              <h2 className="font-bold text-base">Approval Submitted!</h2>
-              <p className="text-xs">Thank you for helping keep your friend's account safe. You may now close this tab.</p>
-            </div>
-          ) : status === 'denied' ? (
-            <div className="bg-rose-50 border border-rose-300 text-rose-900 p-5 rounded-2xl space-y-2 text-center" role="status">
-              <XCircle className="w-10 h-10 text-rose-600 mx-auto" />
-              <h2 className="font-bold text-base">Request Denied</h2>
-              <p className="text-xs">You have flagged this request as denied. SecureBank security has been alerted.</p>
-            </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-800 mb-1">Invitation Code</label>
+                <div className="relative">
+                  <input type="text" required value={invitationCode} onChange={(e) => setInvitationCode(e.target.value)} placeholder="e.g. 123456" className="w-full min-h-[44px] px-3 pl-9 rounded-xl border border-slate-300 text-xs font-bold tracking-wider uppercase focus:ring-2 focus:ring-purple-500" />
+                  <KeyRound className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                </div>
+              </div>
+
+              <button type="submit" disabled={isLoading} className="w-full min-h-[48px] py-3 bg-purple-700 text-white font-bold text-sm rounded-xl hover:bg-purple-800 shadow flex items-center justify-center gap-2">
+                {isLoading ? <span>Validating Code...</span> : <><span>Validate Invitation Code</span><ArrowRight className="w-4 h-4" /></>}
+              </button>
+            </form>
+          ) : step === 'OTP_ENTRY' ? (
+            <form onSubmit={handleConfirmOtp} className="space-y-4 text-left">
+              <div className="bg-purple-50 border border-purple-200 p-3 rounded-xl text-xs text-purple-900 font-medium">
+                Invitation validated for user <strong>{targetUsername}</strong>! A 6-digit verification code was sent to <strong>{contactEmail}</strong>.
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-800 mb-1">6-Digit Email Verification Code</label>
+                <input type="text" maxLength={6} required value={otp} onChange={(e) => setOtp(e.target.value)} placeholder="123456" className="w-full min-h-[44px] px-3 rounded-xl border border-slate-300 text-center text-lg font-mono font-bold tracking-widest focus:ring-2 focus:ring-purple-500" />
+              </div>
+
+              <div className="flex gap-2">
+                <button type="button" onClick={() => setStep('CODE_ENTRY')} className="px-4 text-xs font-bold text-slate-600 border rounded-xl">Back</button>
+                <button type="submit" disabled={isLoading} className="flex-1 min-h-[48px] py-3 bg-emerald-600 text-white font-bold text-sm rounded-xl hover:bg-emerald-700 shadow flex items-center justify-center gap-2">
+                  {isLoading ? <span>Activating...</span> : <><span>Verify & Activate Trusted Contact</span><CheckCircle2 className="w-4 h-4" /></>}
+                </button>
+              </div>
+            </form>
           ) : (
-            <div className="flex flex-col sm:flex-row gap-3 pt-2">
-              <button type="button" disabled={isLoading} onClick={() => handleAction('approved')} className="flex-1 min-h-[48px] py-3 px-4 bg-emerald-600 text-white font-bold text-sm rounded-xl hover:bg-emerald-700 shadow flex items-center justify-center gap-2 transition-colors">
-                <CheckCircle2 className="w-5 h-5" />
-                <span>Yes, Approve Access</span>
-              </button>
-              <button type="button" disabled={isLoading} onClick={() => handleAction('denied')} className="min-h-[48px] py-3 px-4 bg-slate-100 text-slate-700 hover:bg-rose-100 hover:text-rose-800 font-bold text-sm rounded-xl border border-slate-300 flex items-center justify-center gap-2 transition-colors">
-                <XCircle className="w-5 h-5" />
-                <span>Deny Request</span>
-              </button>
+            <div className="bg-emerald-50 border border-emerald-300 text-emerald-900 p-6 rounded-2xl space-y-3 text-center">
+              <CheckCircle2 className="w-12 h-12 text-emerald-600 mx-auto" />
+              <h2 className="font-extrabold text-lg">Trusted Contact Active!</h2>
+              <p className="text-xs font-medium leading-relaxed">
+                Thank you! You are now an active pre-registered trusted contact for <strong>{targetUsername}</strong>. You may now close this page.
+              </p>
             </div>
           )}
         </div>

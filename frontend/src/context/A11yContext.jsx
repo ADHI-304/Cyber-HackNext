@@ -6,7 +6,6 @@ const defaultPrefs = {
   textSize: 'base', // 'sm', 'base', 'lg', 'xl'
   highContrast: false,
   voiceGuidance: false,
-  reducedMotion: false,
 };
 
 export const A11yContext = createContext(null);
@@ -45,13 +44,6 @@ export function A11yProvider({ children }) {
     } else {
       root.classList.remove('high-contrast');
     }
-
-    // Reduced motion class
-    if (prefs.reducedMotion) {
-      root.classList.add('reduced-motion');
-    } else {
-      root.classList.remove('reduced-motion');
-    }
   }, [prefs]);
 
   const setTextSize = (size) => {
@@ -66,10 +58,6 @@ export function A11yProvider({ children }) {
     setPrefs(prev => ({ ...prev, voiceGuidance: !prev.voiceGuidance }));
   };
 
-  const toggleReducedMotion = () => {
-    setPrefs(prev => ({ ...prev, reducedMotion: !prev.reducedMotion }));
-  };
-
   const resetA11yPrefs = () => {
     setPrefs(defaultPrefs);
   };
@@ -81,7 +69,6 @@ export function A11yProvider({ children }) {
         setTextSize,
         toggleHighContrast,
         toggleVoiceGuidance,
-        toggleReducedMotion,
         resetA11yPrefs,
       }}
     >

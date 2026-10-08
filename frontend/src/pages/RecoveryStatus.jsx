@@ -44,8 +44,10 @@ export function RecoveryStatus() {
     await fetchStatus();
   };
 
+  const mandatoryApproved = session?.contacts?.length > 0 && session?.contacts[0]?.status === 'approved';
   const approvedCount = session?.contacts?.filter(c => c.status === 'approved').length || 0;
-  const isApprovedRequired = approvedCount >= 2;
+  const requiredCount = session?.requiredApprovals || Math.min(2, session?.contacts?.length || 2);
+  const isApprovedRequired = session?.completed || (mandatoryApproved && approvedCount >= requiredCount);
 
   const handleDeviceSetup = () => {
     navigate('/reset-password');
@@ -70,7 +72,7 @@ export function RecoveryStatus() {
           </p>
         </div>
 
-        <RecoveryProgressCards approvedCount={approvedCount} isApprovedRequired={isApprovedRequired} timerSeconds={timerSeconds} isTimerFinished={isTimerFinished} />
+        <RecoveryProgressCards approvedCount={approvedCount} requiredCount={requiredCount} isApprovedRequired={isApprovedRequired} timerSeconds={timerSeconds} isTimerFinished={isTimerFinished} />
 
         <div className="space-y-3">
           <div className="flex items-center justify-between">
@@ -109,7 +111,7 @@ export function RecoveryStatus() {
             }`}
           >
             <Smartphone className="w-5 h-5" />
-            <span>{isApprovedRequired ? 'Approvals Met: Set Up New Device Now' : `Waiting for ${2 - approvedCount} more approval(s)...`}</span>
+            <span>{isApprovedRequired ? 'Approvals Met: Set Up New Device Now' : !mandatoryApproved ? 'Waiting for Contact 1 (Mandatory Primary) approval...' : `Waiting for ${requiredCount - approvedCount} more approval(s)...`}</span>
           </button>
         </div>
       </div>

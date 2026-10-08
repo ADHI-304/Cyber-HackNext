@@ -7,6 +7,7 @@ import { HelpPanel } from '../components/HelpPanel';
 import { PasswordMeter } from '../components/PasswordMeter';
 import { A11yProfileSelector } from '../components/A11yProfileSelector';
 import { TotpSetup } from '../components/TotpSetup';
+import { RegisterTrustedContacts } from '../components/RegisterTrustedContacts';
 import { useStruggleScore } from '../hooks/useStruggleScore';
 import { useA11yPrefs } from '../context/A11yContext';
 import { UserPlus, Eye, EyeOff } from 'lucide-react';
@@ -20,6 +21,11 @@ export function Register() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [trustedContacts, setTrustedContacts] = useState([
+    { name: '', email: '', mandatory: true, status: 'pending' },
+    { name: '', email: '', mandatory: false, status: 'pending' },
+    { name: '', email: '', mandatory: false, status: 'pending' }
+  ]);
   const [totpData, setTotpData] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [errorCode, setErrorCode] = useState(null);
@@ -35,7 +41,7 @@ export function Register() {
     }
 
     setIsLoading(true);
-    const res = await register(username, password, prefs);
+    const res = await register(username, password, prefs, trustedContacts);
     setIsLoading(false);
 
     if (!res.ok) {
@@ -109,6 +115,8 @@ export function Register() {
             </div>
 
             <A11yProfileSelector />
+
+            <RegisterTrustedContacts contacts={trustedContacts} setContacts={setTrustedContacts} />
 
             <p className="text-xs text-center text-slate-600 mt-3 high-contrast:text-slate-300">
               Already have an account?{' '}

@@ -1,9 +1,9 @@
 import React from 'react';
 import { useA11yPrefs } from '../context/A11yContext';
-import { Type, Eye as EyeIcon, Volume2, Activity } from 'lucide-react';
+import { Type, Eye as EyeIcon, Volume2 } from 'lucide-react';
 
 export function A11yProfileSelector() {
-  const { prefs, setTextSize, toggleHighContrast, toggleVoiceGuidance, toggleReducedMotion } = useA11yPrefs();
+  const { prefs, setTextSize, toggleHighContrast, toggleVoiceGuidance } = useA11yPrefs();
 
   return (
     <fieldset className="border border-slate-200 rounded-xl p-4 bg-sky-50/50 space-y-2 high-contrast:bg-slate-800 high-contrast:border-slate-700">
@@ -45,18 +45,6 @@ export function A11yProfileSelector() {
           />
           <span className="font-semibold text-slate-800 flex items-center gap-1 high-contrast:text-slate-200">
             <Volume2 className="w-3.5 h-3.5 text-sky-600" /> Voice Guidance
-          </span>
-        </label>
-
-        <label className="flex items-center gap-2 cursor-pointer p-2 rounded hover:bg-sky-100/50">
-          <input 
-            type="checkbox" 
-            checked={prefs.reducedMotion} 
-            onChange={toggleReducedMotion}
-            className="w-4 h-4 rounded text-sky-600 focus:ring-sky-500"
-          />
-          <span className="font-semibold text-slate-800 flex items-center gap-1 high-contrast:text-slate-200">
-            <Activity className="w-3.5 h-3.5 text-sky-600" /> Reduced Motion
           </span>
         </label>
       </div>

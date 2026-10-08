@@ -19,7 +19,7 @@ export function VerifyOtp() {
   const { score, isGuidedMode, addStrugglePoints, resetScore, activeHelpMode, setActiveHelpMode } = useStruggleScore('VerifyOtp');
 
   const [code, setCode] = useState('');
-  const [timerSeconds, setTimerSeconds] = useState(30);
+  const [timerSeconds, setTimerSeconds] = useState(300);
   const [isExpired, setIsExpired] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [errorCode, setErrorCode] = useState(null);
@@ -49,12 +49,12 @@ export function VerifyOtp() {
     const res = await verifyOtp(username, otpToVerify);
     setIsLoading(false);
 
-    if (!res.ok) {
-      addStrugglePoints(2, 'failed_otp_attempt');
-      setErrorCode(res.errorCode);
-    } else {
-      completeLogin(res.data.user);
+    if (res && (res.ok || res.success)) {
+      completeLogin(res.data?.user || { username, name: username.split('@')[0], role: 'customer' });
       navigate('/dashboard');
+    } else {
+      addStrugglePoints(2, 'failed_otp_attempt');
+      setErrorCode(res?.errorCode || 'OTP_INVALID');
     }
   };
 
@@ -64,12 +64,14 @@ export function VerifyOtp() {
     const res = await resendOtp(username);
     setIsLoading(false);
 
-    if (res.ok) {
+    if (res && (res.ok || res.success)) {
       setCode('');
-      setTimerSeconds(30);
+      setTimerSeconds(300);
       setIsExpired(false);
       setResendSuccess(true);
       setTimeout(() => setResendSuccess(false), 3000);
+    } else {
+      setErrorCode(res?.errorCode || 'RATE_LIMITED');
     }
   };
 

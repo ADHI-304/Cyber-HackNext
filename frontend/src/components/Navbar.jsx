@@ -106,6 +106,17 @@ export function Navbar() {
                   </li>
                   <li>
                     <Link
+                      to="/contact-approval"
+                      className={`min-h-[44px] px-3 py-2 text-sm font-medium rounded-lg text-purple-800 hover:bg-purple-50 flex items-center gap-1.5 transition-colors ${
+                        isActive('/contact-approval') ? 'bg-purple-100 font-semibold' : ''
+                      }`}
+                    >
+                      <Shield className="w-4 h-4 text-purple-700" aria-hidden="true" />
+                      <span>Accept Trusted Contact</span>
+                    </Link>
+                  </li>
+                  <li>
+                    <Link
                       to="/recovery-start"
                       className={`min-h-[44px] px-3 py-2 text-sm font-medium rounded-lg text-slate-700 hover:bg-slate-100 flex items-center gap-1.5 transition-colors ${
                         isActive('/recovery-start') ? 'bg-slate-100 text-slate-900 font-semibold' : ''
