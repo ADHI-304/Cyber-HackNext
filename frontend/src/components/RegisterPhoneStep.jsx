@@ -23,21 +23,22 @@ export function RegisterPhoneStep({ username, phone, onVerified, onBack }) {
     return () => clearInterval(timer);
   }, [cooldown]);
 
-  const handleVerify = async () => {
-    if (!code || code.length < 6) {
-      setErrorMsg('Please enter a 6-digit verification code.');
+  const handleVerify = async (otpToVerify) => {
+    const targetCode = (typeof otpToVerify === 'string' && otpToVerify.length > 0) ? otpToVerify : code;
+    if (!targetCode || targetCode.length < 6) {
+      setErrorMsg('Please enter a valid 6-digit OTP.');
       return;
     }
     setIsVerifying(true);
     setErrorMsg(null);
-    const res = await verifyRegistrationPhone(username, phone, code);
+    const res = await verifyRegistrationPhone(username, phone, targetCode);
     setIsVerifying(false);
 
     if (res.ok || res.success) {
       setIsVerified(true);
       setSuccessMsg('Phone number verified ✓');
     } else {
-      setErrorMsg(res.message || 'Invalid or expired verification code.');
+      setErrorMsg(res.message || 'Invalid OTP');
     }
   };
 
@@ -81,7 +82,7 @@ export function RegisterPhoneStep({ username, phone, onVerified, onBack }) {
         </div>
       ) : (
         <div className="space-y-3">
-          <OtpInput length={6} value={code} onChange={setCode} onComplete={handleVerify} />
+          <OtpInput length={6} value={code} onChange={setCode} onComplete={(val) => handleVerify(val)} />
 
           <div className="flex items-center justify-between text-xs px-1">
             <button

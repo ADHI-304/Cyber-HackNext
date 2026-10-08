@@ -15,6 +15,8 @@ export function SimpleRecoveryViews({ selectedMethod, username, onBack }) {
   const [isVerifying, setIsVerifying] = useState(false);
   const [errorMsg, setErrorMsg] = useState(null);
 
+  const [demoHint, setDemoHint] = useState(null);
+
   const targetUser = username || 'user@securebank.com';
 
   useEffect(() => {
@@ -24,22 +26,31 @@ export function SimpleRecoveryViews({ selectedMethod, username, onBack }) {
         const res = await requestPhoneRecoveryOtp(targetUser);
         if (res.data?.maskedPhone) {
           setMaskedPhone(res.data.maskedPhone);
-        } else if (res.ok === false || res.data?.success === false) {
+        }
+        if (res.data?.demoCodeHint) {
+          setDemoHint(res.data.demoCodeHint);
+        }
+        if (res.ok === false || res.data?.success === false) {
           setErrorMsg(res.data?.message || res.message || 'No verified phone number registered for this account.');
         }
       })();
     }
   }, [selectedMethod, targetUser]);
 
-  const handleVerifyPhone = async () => {
+  const handleVerifyPhone = async (otpToVerify) => {
+    const targetCode = (typeof otpToVerify === 'string' && otpToVerify.length > 0) ? otpToVerify : code;
+    if (!targetCode || targetCode.length < 6) {
+      setErrorMsg('Please enter a valid 6-digit OTP.');
+      return;
+    }
     setIsVerifying(true);
     setErrorMsg(null);
-    const res = await verifyPhoneRecoveryOtp(targetUser, code || '123456');
+    const res = await verifyPhoneRecoveryOtp(targetUser, targetCode);
     setIsVerifying(false);
-    if (res.ok || res.success) {
+    if (res.ok || res.success || res.data?.success) {
       navigate('/reset-password');
     } else {
-      setErrorMsg(res.message || 'Invalid code');
+      setErrorMsg(res.data?.message || res.message || 'Invalid OTP');
     }
   };
 
@@ -50,15 +61,20 @@ export function SimpleRecoveryViews({ selectedMethod, username, onBack }) {
     setEmailSent(true);
   };
 
-  const handleVerifyTotp = async () => {
+  const handleVerifyTotp = async (otpToVerify) => {
+    const targetCode = (typeof otpToVerify === 'string' && otpToVerify.length > 0) ? otpToVerify : code;
+    if (!targetCode || targetCode.length < 6) {
+      setErrorMsg('Please enter a valid 6-digit OTP.');
+      return;
+    }
     setIsVerifying(true);
     setErrorMsg(null);
-    const res = await verifyTotpRecovery(targetUser, code || '123456');
+    const res = await verifyTotpRecovery(targetUser, targetCode);
     setIsVerifying(false);
-    if (res.ok || res.success) {
+    if (res.ok || res.success || res.data?.success) {
       navigate('/reset-password');
     } else {
-      setErrorMsg(res.message || 'Invalid TOTP code');
+      setErrorMsg(res.data?.message || res.message || 'Invalid OTP');
     }
   };
 
@@ -73,9 +89,9 @@ export function SimpleRecoveryViews({ selectedMethod, username, onBack }) {
         <p className="text-xs text-slate-600 font-medium">{t('recoveryPhoneDesc')} <strong className="text-slate-900 font-mono">{maskedPhone}</strong>.</p>
 
         <div className="space-y-2">
-          <OtpInput length={6} value={code} onChange={setCode} onComplete={handleVerifyPhone} />
-          <button type="button" onClick={() => setCode('123456')} className="text-[11px] font-bold text-sky-700 bg-sky-50 border border-sky-200 px-3 py-1.5 rounded-lg hover:bg-sky-100 transition-colors">
-            {t('autoFillDemoCode')}
+          <OtpInput length={6} value={code} onChange={setCode} onComplete={(val) => handleVerifyPhone(val)} />
+          <button type="button" onClick={() => setCode(demoHint || '123456')} className="text-[11px] font-bold text-sky-700 bg-sky-50 border border-sky-200 px-3 py-1.5 rounded-lg hover:bg-sky-100 transition-colors">
+            {t('autoFillDemoCode')} {demoHint ? `(${demoHint})` : ''}
           </button>
         </div>
 
@@ -83,7 +99,7 @@ export function SimpleRecoveryViews({ selectedMethod, username, onBack }) {
         
         <div className="flex gap-2">
           <button type="button" onClick={onBack} className="flex-1 py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-xl border">Back</button>
-          <button type="button" onClick={handleVerifyPhone} disabled={isVerifying} className="flex-1 py-2.5 text-xs font-bold text-white bg-sky-600 hover:bg-sky-700 rounded-xl disabled:opacity-50">
+          <button type="button" onClick={() => handleVerifyPhone()} disabled={isVerifying} className="flex-1 py-2.5 text-xs font-bold text-white bg-sky-600 hover:bg-sky-700 rounded-xl disabled:opacity-50">
             {isVerifying ? 'Verifying...' : t('verifyCode')}
           </button>
         </div>
@@ -130,7 +146,7 @@ export function SimpleRecoveryViews({ selectedMethod, username, onBack }) {
         <p className="text-xs text-slate-600 font-medium">{t('recoveryTotpDesc')}</p>
 
         <div className="space-y-2">
-          <OtpInput length={6} value={code} onChange={setCode} onComplete={handleVerifyTotp} />
+          <OtpInput length={6} value={code} onChange={setCode} onComplete={(val) => handleVerifyTotp(val)} />
           <button type="button" onClick={() => setCode('123456')} className="text-[11px] font-bold text-amber-800 bg-amber-50 border border-amber-200 px-3 py-1.5 rounded-lg hover:bg-amber-100 transition-colors">
             {t('autoFillDemoCode')}
           </button>
@@ -140,7 +156,7 @@ export function SimpleRecoveryViews({ selectedMethod, username, onBack }) {
 
         <div className="flex gap-2">
           <button type="button" onClick={onBack} className="flex-1 py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-xl border">Back</button>
-          <button type="button" onClick={handleVerifyTotp} disabled={isVerifying} className="flex-1 py-2.5 text-xs font-bold text-white bg-amber-600 hover:bg-amber-700 rounded-xl disabled:opacity-50">
+          <button type="button" onClick={() => handleVerifyTotp()} disabled={isVerifying} className="flex-1 py-2.5 text-xs font-bold text-white bg-amber-600 hover:bg-amber-700 rounded-xl disabled:opacity-50">
             {isVerifying ? 'Verifying...' : t('verifyCode')}
           </button>
         </div>

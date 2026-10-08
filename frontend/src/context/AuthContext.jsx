@@ -23,6 +23,7 @@ export function AuthProvider({ children }) {
     setPendingOtpUser(null);
     try {
       sessionStorage.setItem('authbuddy_user', JSON.stringify(userData));
+      localStorage.setItem('authbuddy_user', JSON.stringify(userData));
     } catch (e) {
       console.warn('Could not save user session', e);
     }
@@ -33,6 +34,7 @@ export function AuthProvider({ children }) {
     setPendingOtpUser(null);
     try {
       sessionStorage.removeItem('authbuddy_user');
+      localStorage.removeItem('authbuddy_user');
     } catch (e) {
       console.warn('Could not remove user session', e);
     }

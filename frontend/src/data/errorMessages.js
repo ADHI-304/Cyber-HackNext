@@ -10,6 +10,14 @@ export function getErrorMessage(code, lang = 'en') {
         nextAction: t(lang, 'errInvalidCredsText'),
         icon: 'ShieldAlert'
       };
+    case 'OTP_INCOMPLETE':
+      return {
+        code: 'OTP_INCOMPLETE',
+        title: 'Incomplete Verification Code',
+        plainExplanation: 'Please enter a valid 6-digit OTP.',
+        nextAction: 'Please enter the full 6 digits to verify.',
+        icon: 'KeyRound'
+      };
     case 'OTP_EXPIRED':
       return {
         code: 'OTP_EXPIRED',
@@ -21,9 +29,9 @@ export function getErrorMessage(code, lang = 'en') {
     case 'OTP_INVALID':
       return {
         code: 'OTP_INVALID',
-        title: t(lang, 'errOtpInvalidTitle'),
-        plainExplanation: t(lang, 'errOtpInvalidText'),
-        nextAction: t(lang, 'errOtpInvalidText'),
+        title: 'Invalid OTP',
+        plainExplanation: 'Invalid OTP. The verification code is incorrect.',
+        nextAction: 'Please double-check your code and re-type the digits carefully.',
         icon: 'KeyRound'
       };
     case 'ACCOUNT_LOCKED':

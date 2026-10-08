@@ -24,15 +24,17 @@ export function Dashboard() {
           </p>
         </div>
 
-        <div className="flex flex-wrap gap-2">
-          <Link
-            to="/admin-friction"
-            className="min-h-[44px] px-4 py-2.5 bg-amber-400 text-slate-950 font-bold text-sm rounded-xl hover:bg-amber-300 shadow flex items-center gap-1.5 transition-colors"
-          >
-            <BarChart3 className="w-4 h-4" />
-            <span>Admin Friction Metrics</span>
-          </Link>
-        </div>
+        {user?.role === 'admin' && (
+          <div className="flex flex-wrap gap-2">
+            <Link
+              to="/admin-friction"
+              className="min-h-[44px] px-4 py-2.5 bg-amber-400 text-slate-950 font-bold text-sm rounded-xl hover:bg-amber-300 shadow flex items-center gap-1.5 transition-colors"
+            >
+              <BarChart3 className="w-4 h-4" />
+              <span>Admin Friction Metrics</span>
+            </Link>
+          </div>
+        )}
       </div>
 
       {/* Account Overview Cards */}
@@ -90,23 +92,25 @@ export function Dashboard() {
             </div>
           </Link>
 
-          <Link
-            to="/admin-friction"
-            className="p-4 bg-white border border-slate-200 rounded-xl hover:border-sky-500 shadow-sm flex items-start gap-3 transition-colors group high-contrast:bg-slate-800 high-contrast:border-slate-700"
-          >
-            <div className="p-2.5 bg-amber-100 text-amber-700 rounded-xl group-hover:bg-amber-600 group-hover:text-white transition-colors">
-              <BarChart3 className="w-5 h-5" />
-            </div>
-            <div>
-              <h3 className="font-bold text-slate-900 text-sm group-hover:text-sky-600 high-contrast:text-white flex items-center gap-1">
-                <span>Admin Friction Dashboard</span>
-                <ArrowUpRight className="w-4 h-4 opacity-50" />
-              </h3>
-              <p className="text-xs text-slate-600 mt-1 leading-relaxed high-contrast:text-slate-300">
-                View real-time telemetry, failure rate per step, and struggle scores.
-              </p>
-            </div>
-          </Link>
+          {user?.role === 'admin' && (
+            <Link
+              to="/admin-friction"
+              className="p-4 bg-white border border-slate-200 rounded-xl hover:border-sky-500 shadow-sm flex items-start gap-3 transition-colors group high-contrast:bg-slate-800 high-contrast:border-slate-700"
+            >
+              <div className="p-2.5 bg-amber-100 text-amber-700 rounded-xl group-hover:bg-amber-600 group-hover:text-white transition-colors">
+                <BarChart3 className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="font-bold text-slate-900 text-sm group-hover:text-sky-600 high-contrast:text-white flex items-center gap-1">
+                  <span>Admin Friction Dashboard</span>
+                  <ArrowUpRight className="w-4 h-4 opacity-50" />
+                </h3>
+                <p className="text-xs text-slate-600 mt-1 leading-relaxed high-contrast:text-slate-300">
+                  View real-time telemetry, failure rate per step, and struggle scores.
+                </p>
+              </div>
+            </Link>
+          )}
         </div>
       </div>
     </main>

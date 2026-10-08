@@ -27,9 +27,11 @@ def init_db():
         username TEXT PRIMARY KEY,
         password TEXT NOT NULL,
         name TEXT,
+        role TEXT DEFAULT 'user',
         email_verified INTEGER DEFAULT 0,
         phone_number TEXT,
         phone_verified INTEGER DEFAULT 0,
+        totp_secret TEXT DEFAULT 'JBSWY3DPEHPK3PXP',
         accessibility_profile TEXT DEFAULT '{}',
         trusted_contacts_json TEXT DEFAULT '[]'
     )
@@ -43,6 +45,10 @@ def init_db():
         cursor.execute("ALTER TABLE users ADD COLUMN phone_number TEXT")
     if 'phone_verified' not in cols:
         cursor.execute("ALTER TABLE users ADD COLUMN phone_verified INTEGER DEFAULT 0")
+    if 'role' not in cols:
+        cursor.execute("ALTER TABLE users ADD COLUMN role TEXT DEFAULT 'user'")
+    if 'totp_secret' not in cols:
+        cursor.execute("ALTER TABLE users ADD COLUMN totp_secret TEXT DEFAULT 'JBSWY3DPEHPK3PXP'")
 
     # 2. Email OTPs Table
     cursor.execute("""
@@ -85,10 +91,19 @@ def init_db():
         approvals INTEGER DEFAULT 0,
         required_approvals INTEGER DEFAULT 2,
         delay_seconds INTEGER DEFAULT 60,
+        delay_started_at REAL DEFAULT 0,
+        approval_tokens_json TEXT DEFAULT '{}',
         completed INTEGER DEFAULT 0,
         created_at REAL NOT NULL
     )
     """)
+
+    cursor.execute("PRAGMA table_info(recovery_sessions)")
+    rec_cols = [r['name'] for r in cursor.fetchall()]
+    if 'delay_started_at' not in rec_cols:
+        cursor.execute("ALTER TABLE recovery_sessions ADD COLUMN delay_started_at REAL DEFAULT 0")
+    if 'approval_tokens_json' not in rec_cols:
+        cursor.execute("ALTER TABLE recovery_sessions ADD COLUMN approval_tokens_json TEXT DEFAULT '{}'")
 
     # 6. Telemetry Events Table
     cursor.execute("""
@@ -100,6 +115,28 @@ def init_db():
         metadata_json TEXT DEFAULT '{}'
     )
     """)
+
+    # Seed default demo & admin users if DB is fresh
+    from app.services.security import hash_password
+    
+    cursor.execute("SELECT COUNT(*) FROM users WHERE username = 'user@securebank.com'")
+    if cursor.fetchone()[0] == 0:
+        cursor.execute(
+            "INSERT INTO users (username, password, name, role, email_verified, phone_number, phone_verified, totp_secret) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            ("user@securebank.com", hash_password("Password123!"), "Alex Johnson", "user", 1, "+919876543210", 1, "JBSWY3DPEHPK3PXP")
+        )
+    cursor.execute("SELECT COUNT(*) FROM users WHERE username = 'demo'")
+    if cursor.fetchone()[0] == 0:
+        cursor.execute(
+            "INSERT INTO users (username, password, name, role, email_verified, phone_number, phone_verified, totp_secret) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            ("demo", hash_password("Password123!"), "Demo User", "user", 1, "+919876543210", 1, "JBSWY3DPEHPK3PXP")
+        )
+    cursor.execute("SELECT COUNT(*) FROM users WHERE username = 'admin@securebank.com'")
+    if cursor.fetchone()[0] == 0:
+        cursor.execute(
+            "INSERT INTO users (username, password, name, role, email_verified, phone_number, phone_verified, totp_secret) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            ("admin@securebank.com", hash_password("Password123!"), "Admin User", "admin", 1, "+919999999999", 1, "JBSWY3DPEHPK3PXP")
+        )
 
     conn.commit()
     conn.close()
@@ -135,14 +172,18 @@ def db_get_user(username: str) -> Optional[Dict[str, Any]]:
     trusted_contacts = json.loads(row['trusted_contacts_json'] or '[]') if 'trusted_contacts_json' in keys else []
     phone_number = row['phone_number'] if 'phone_number' in keys else None
     phone_verified = bool(row['phone_verified']) if 'phone_verified' in keys else False
+    role = row['role'] if 'role' in keys else 'user'
+    totp_secret = row['totp_secret'] if 'totp_secret' in keys else 'JBSWY3DPEHPK3PXP'
 
     return {
         'username': row['username'],
         'password': row['password'],
         'name': row['name'] or row['username'].split('@')[0],
+        'role': role,
         'emailVerified': bool(row['email_verified']),
         'phoneNumber': phone_number,
         'phoneVerified': phone_verified,
+        'totpSecret': totp_secret,
         'accessibilityProfile': json.loads(row['accessibility_profile'] or '{}'),
         'trustedContacts': trusted_contacts
     }
@@ -153,24 +194,28 @@ def db_save_user(username: str, data: Dict[str, Any]):
     user_key = username.strip()
     password = data.get('password', 'Password123!')
     name = data.get('name', user_key.split('@')[0])
+    role = data.get('role', 'user')
     email_verified = 1 if data.get('emailVerified', False) else 0
     phone_number = data.get('phoneNumber', None)
     phone_verified = 1 if data.get('phoneVerified', False) else 0
+    totp_secret = data.get('totpSecret', 'JBSWY3DPEHPK3PXP')
     acc_profile = json.dumps(data.get('accessibilityProfile', {}))
     trusted_contacts = json.dumps(data.get('trustedContacts', []))
 
     cursor.execute("""
-    INSERT INTO users (username, password, name, email_verified, phone_number, phone_verified, accessibility_profile, trusted_contacts_json)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO users (username, password, name, role, email_verified, phone_number, phone_verified, totp_secret, accessibility_profile, trusted_contacts_json)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(username) DO UPDATE SET
         password = excluded.password,
         name = excluded.name,
+        role = excluded.role,
         email_verified = excluded.email_verified,
         phone_number = excluded.phone_number,
         phone_verified = excluded.phone_verified,
+        totp_secret = excluded.totp_secret,
         accessibility_profile = excluded.accessibility_profile,
         trusted_contacts_json = excluded.trusted_contacts_json
-    """, (user_key, password, name, email_verified, phone_number, phone_verified, acc_profile, trusted_contacts))
+    """, (user_key, password, name, role, email_verified, phone_number, phone_verified, totp_secret, acc_profile, trusted_contacts))
     conn.commit()
     conn.close()
 
@@ -186,13 +231,17 @@ def db_get_all_users() -> Dict[str, Dict[str, Any]]:
         trusted = json.loads(r['trusted_contacts_json'] or '[]') if 'trusted_contacts_json' in keys else []
         phone_number = r['phone_number'] if 'phone_number' in keys else None
         phone_verified = bool(r['phone_verified']) if 'phone_verified' in keys else False
+        role = r['role'] if 'role' in keys else 'user'
+        totp_secret = r['totp_secret'] if 'totp_secret' in keys else 'JBSWY3DPEHPK3PXP'
         result[r['username']] = {
             'username': r['username'],
             'password': r['password'],
             'name': r['name'] or r['username'].split('@')[0],
+            'role': role,
             'emailVerified': bool(r['email_verified']),
             'phoneNumber': phone_number,
             'phoneVerified': phone_verified,
+            'totpSecret': totp_secret,
             'accessibilityProfile': json.loads(r['accessibility_profile'] or '{}'),
             'trustedContacts': trusted
         }
@@ -340,6 +389,10 @@ def db_get_recovery_session(session_id: str) -> Optional[Dict[str, Any]]:
     conn.close()
     if not row:
         return None
+    keys = row.keys()
+    delay_started = row['delay_started_at'] if 'delay_started_at' in keys else 0
+    approval_tokens = json.loads(row['approval_tokens_json'] or '{}') if 'approval_tokens_json' in keys else {}
+
     return {
         'id': row['id'],
         'username': row['username'],
@@ -347,6 +400,8 @@ def db_get_recovery_session(session_id: str) -> Optional[Dict[str, Any]]:
         'approvals': row['approvals'],
         'requiredApprovals': row['required_approvals'],
         'delaySeconds': row['delay_seconds'],
+        'delayStartedAt': delay_started,
+        'approvalTokens': approval_tokens,
         'completed': bool(row['completed']),
         'createdAt': row['created_at']
     }
@@ -355,14 +410,16 @@ def db_save_recovery_session(session_id: str, session_data: Dict[str, Any]):
     conn = get_db()
     cursor = conn.cursor()
     cursor.execute("""
-    INSERT INTO recovery_sessions (id, username, contacts_json, approvals, required_approvals, delay_seconds, completed, created_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO recovery_sessions (id, username, contacts_json, approvals, required_approvals, delay_seconds, delay_started_at, approval_tokens_json, completed, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(id) DO UPDATE SET
         username = excluded.username,
         contacts_json = excluded.contacts_json,
         approvals = excluded.approvals,
         required_approvals = excluded.required_approvals,
         delay_seconds = excluded.delay_seconds,
+        delay_started_at = excluded.delay_started_at,
+        approval_tokens_json = excluded.approval_tokens_json,
         completed = excluded.completed
     """, (
         session_id,
@@ -371,6 +428,8 @@ def db_save_recovery_session(session_id: str, session_data: Dict[str, Any]):
         session_data.get('approvals', 0),
         session_data.get('requiredApprovals', 2),
         session_data.get('delaySeconds', 60),
+        session_data.get('delayStartedAt', 0),
+        json.dumps(session_data.get('approvalTokens', {})),
         1 if session_data.get('completed', False) else 0,
         session_data.get('createdAt', time.time())
     ))

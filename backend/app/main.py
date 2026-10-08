@@ -3,7 +3,8 @@ load_dotenv()
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.routers import auth, recovery, telemetry, tts
+from app.routers import auth, recovery, telemetry, tts, ai
+from app.config import CORS_ORIGINS
 
 app = FastAPI(
     title="AuthBuddy Backend API",
@@ -13,10 +14,10 @@ app = FastAPI(
     redoc_url="/redoc"
 )
 
-# CORS Middleware setup to allow requests from the React frontend
+# CORS Middleware setup with configured origins
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allows all origins, including localhost:3000
+    allow_origins=CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -27,6 +28,7 @@ app.include_router(auth.router)
 app.include_router(recovery.router)
 app.include_router(telemetry.router)
 app.include_router(tts.router)
+app.include_router(ai.router)
 
 @app.get("/", tags=["Health Check"])
 async def root_health_check():

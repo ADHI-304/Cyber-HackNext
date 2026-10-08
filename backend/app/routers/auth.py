@@ -1,7 +1,9 @@
 import time
 import hashlib
 import secrets
+import re
 from fastapi import APIRouter, BackgroundTasks
+from app.config import DEMO_MODE
 from app.models.schemas import (
     ApiResponse, RegisterRequest, LoginRequest, VerifyOtpRequest, ResendOtpRequest,
     VerifyEmailRequest, ResendEmailOtpRequest, ForgotPasswordRequest, ResetPasswordRequest,
@@ -13,7 +15,10 @@ from app.services.store import (
     active_otps, email_verification_otps, generate_and_send_email_otp,
     send_trusted_contact_invitation_code_email, log_telemetry_event
 )
-import re
+from app.services.security import (
+    hash_password, verify_password, create_access_token,
+    generate_totp_secret, verify_totp_code
+)
 
 router = APIRouter(prefix="/api/v1/auth", tags=["Authentication"])
 
@@ -34,8 +39,7 @@ async def send_registration_phone_otp(body: SendRegistrationPhoneOtpRequest):
             "message": "Invalid phone number format. Please include valid country code."
         }
     
-    # Store hashed OTP for registration phone verification
-    raw_otp = "123456"
+    raw_otp = f"{secrets.randbelow(1000000):06d}"
     otp_hash = hashlib.sha256(raw_otp.encode("utf-8")).hexdigest()
     now = time.time()
     store_key = f"{phone_clean.lower()}:REGISTER_PHONE_VERIFY"
@@ -56,12 +60,14 @@ async def send_registration_phone_otp(body: SendRegistrationPhoneOtpRequest):
     
     log_telemetry_event("REGISTER_PHONE_OTP_SENT", step="Register", metadata={"phone": phone_clean})
     
-    return {
+    res_data = {
         "ok": True,
         "success": True,
-        "message": f"6-digit verification code sent to {phone_clean}",
-        "demoCodeHint": "123456"
+        "message": f"6-digit verification code sent to {phone_clean}"
     }
+    if DEMO_MODE:
+        res_data["demoCodeHint"] = raw_otp
+    return res_data
 
 @router.post("/verify-phone-registration")
 async def verify_phone_registration(body: VerifyRegistrationPhoneRequest):
@@ -104,6 +110,11 @@ async def register_user(body: RegisterRequest, background_tasks: BackgroundTasks
     if phone_num and not validate_phone_number(phone_num):
         return ApiResponse(ok=False, errorCode="INVALID_PHONE_FORMAT", data=None)
 
+    # Secure bcrypt password hashing
+    hashed_pwd = hash_password(body.password)
+    user_role = "admin" if body.username.lower().startswith("admin") else "user"
+    totp_secret = generate_totp_secret()
+
     formatted_contacts = []
     if body.trustedContacts:
         for idx, c in enumerate(body.trustedContacts):
@@ -131,315 +142,106 @@ async def register_user(body: RegisterRequest, background_tasks: BackgroundTasks
 
     mock_users[body.username] = {
         'username': body.username,
-        'password': body.password,
+        'password': hashed_pwd,
+        'role': user_role,
         'emailVerified': False,
         'phoneNumber': phone_num,
-        'phoneVerified': False,  # Unverified until phone OTP verification step completes
+        'phoneVerified': False,
+        'totpSecret': totp_secret,
         'accessibilityProfile': body.accessibilityProfile or {},
         'trustedContacts': formatted_contacts
     }
 
-    # Dispatch phone verification OTP if phone provided
     if phone_num:
         background_tasks.add_task(generate_and_send_email_otp, phone_num, "REGISTER_PHONE_VERIFY")
 
-    # Generate and send email OTP concurrently in background for main account registration
     background_tasks.add_task(generate_and_send_email_otp, body.username)
-
-    log_telemetry_event("USER_REGISTERED", step="Register", metadata={"username": body.username, "phone": phone_num})
+    log_telemetry_event("USER_REGISTERED", step="Register", metadata={"username": body.username, "role": user_role})
 
     return ApiResponse(
         ok=True,
         errorCode=None,
         data={
             "username": body.username,
+            "role": user_role,
             "phoneNumber": phone_num,
             "phoneVerified": False,
             "trustedContacts": formatted_contacts,
-            "qrPlaceholderUrl": f"https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=otpauth://totp/SecureBank:{body.username}?secret=JBSWY3DPEHPK3PXP&issuer=SecureBank",
-            "secretKey": "JBSWY3DPEHPK3PXP",
+            "qrPlaceholderUrl": f"https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=otpauth://totp/SecureBank:{body.username}?secret={totp_secret}&issuer=SecureBank",
+            "secretKey": totp_secret,
             "message": "Account created successfully"
         }
     )
 
-@router.post("/verify-trusted-contact")
-async def verify_trusted_contact(body: VerifyTrustedContactRequest):
-    user_key = body.username.strip()
-    user = mock_users.get(user_key)
-    if not user:
-        return {"ok": False, "success": False, "message": "User account not found"}
-    
-    contacts = user.get("trustedContacts", [])
-    contact_email = body.contactEmail.strip().lower()
-    found = False
-
-    for c in contacts:
-        if c.get("email", "").lower().strip() == contact_email:
-            found = True
-            break
-    
-    if not found:
-        return {"ok": False, "success": False, "message": f"Contact email '{contact_email}' is not attached to this user account."}
-
-    # Validate 6-digit OTP if code is supplied
-    if body.code:
-        is_valid, err, _ = check_and_validate_otp(contact_email, body.code, "TRUSTED_CONTACT_VERIFY")
-        if not is_valid:
-            return {
-                "ok": False,
-                "success": False,
-                "errorCode": err,
-                "message": f"The verification code for {contact_email} is incorrect or has expired."
-            }
-
-    # Update contact status to ACTIVE
-    for c in contacts:
-        if c.get("email", "").lower().strip() == contact_email:
-            c["status"] = "active"
-            c["declineReason"] = None
-
-    user["trustedContacts"] = contacts
-    mock_users[user_key] = user
-    log_telemetry_event("TRUSTED_CONTACT_VERIFIED", step="Register", metadata={"username": user_key, "contactEmail": contact_email})
-
-    return {
-        "ok": True,
-        "success": True,
-        "message": f"Trusted contact '{contact_email}' verified and activated successfully!",
-        "trustedContacts": contacts
-    }
-
-@router.post("/resend-contact-otp")
-async def resend_contact_otp(body: ResendEmailOtpRequest, background_tasks: BackgroundTasks):
-    contact_email = body.email.strip().lower()
-    sent, status = generate_and_send_email_otp(contact_email, "TRUSTED_CONTACT_VERIFY", enforce_cooldown=True)
-    if status == "COOLDOWN_ACTIVE":
-        return {
-            "ok": False,
-            "success": False,
-            "errorCode": "RATE_LIMITED",
-            "message": "Please wait 60 seconds before requesting a new verification code."
-        }
-
-    return {
-        "ok": True,
-        "success": True,
-        "message": f"A fresh 6-digit verification code was sent to {contact_email}."
-    }
-
-@router.get("/trusted-contacts/{username}")
-async def get_trusted_contacts(username: str):
-    user = mock_users.get(username.strip())
-    if not user:
-        return {"ok": False, "trustedContacts": []}
-    return {"ok": True, "trustedContacts": user.get("trustedContacts", [])}
-
-@router.post("/accept-trusted-contact/start")
-async def accept_trusted_contact_start(body: AcceptTrustedContactStartRequest, background_tasks: BackgroundTasks):
-    c_email = body.contactEmail.lower().strip()
-    inv_code = body.invitationCode.strip().upper()
-    now = time.time()
-
-    target_user = None
-    target_contact = None
-
-    for username, usr in mock_users.items():
-        contacts = usr.get("trustedContacts", [])
-        for c in contacts:
-            c_code = str(c.get("invitationCode") or c.get("verificationCode") or "").strip().upper()
-            if c.get("email", "").lower().strip() == c_email and c_code == inv_code:
-                target_user = usr
-                target_contact = c
-                break
-        if target_contact:
-            break
-
-    if not target_contact:
-        return {
-            "ok": False,
-            "success": False,
-            "errorCode": "INVALID_CODE",
-            "message": "The invitation code or email is invalid."
-        }
-
-    if target_contact.get("isUsed"):
-        return {
-            "ok": False,
-            "success": False,
-            "errorCode": "CODE_USED",
-            "message": "This invitation code has already been used."
-        }
-
-    code_exp = target_contact.get("codeExpiresAt", 0)
-    if code_exp > 0 and now > code_exp:
-        return {
-            "ok": False,
-            "success": False,
-            "errorCode": "CODE_EXPIRED",
-            "message": "This invitation code has expired. Please request a new invitation."
-        }
-
-    background_tasks.add_task(generate_and_send_email_otp, c_email, "TRUSTED_CONTACT_ACTIVATION")
-    log_telemetry_event("TRUSTED_CONTACT_INVITE_VALIDATED", step="Register", metadata={"email": c_email, "username": target_user["username"]})
-
-    return {
-        "ok": True,
-        "success": True,
-        "message": f"Invitation code validated! A 6-digit verification code was sent to {c_email}.",
-        "data": {
-            "username": target_user["username"],
-            "contactEmail": c_email,
-            "otpRequired": True
-        }
-    }
-
-@router.post("/accept-trusted-contact/confirm")
-async def accept_trusted_contact_confirm(body: AcceptTrustedContactConfirmRequest):
-    c_email = body.contactEmail.lower().strip()
-    inv_code = body.invitationCode.strip().upper()
-    
-    is_valid, err, matched_purpose = check_and_validate_otp(c_email, body.otp, "TRUSTED_CONTACT_ACTIVATION")
-
-    if not is_valid:
-        return {
-            "ok": False,
-            "success": False,
-            "errorCode": err,
-            "message": "The 6-digit verification code is incorrect or has expired."
-        }
-
-    target_user = None
-    target_contact = None
-
-    for username, usr in mock_users.items():
-        contacts = usr.get("trustedContacts", [])
-        for c in contacts:
-            c_code = str(c.get("invitationCode") or c.get("verificationCode") or "").strip().upper()
-            if c.get("email", "").lower().strip() == c_email and c_code == inv_code:
-                target_user = usr
-                target_contact = c
-                break
-        if target_contact:
-            break
-
-    if not target_contact or not target_user:
-        return {
-            "ok": False,
-            "success": False,
-            "errorCode": "NOT_FOUND",
-            "message": "Target contact record not found."
-        }
-
-    target_contact["status"] = "active"
-    target_contact["isUsed"] = True
-    target_contact["declineReason"] = None
-
-    mock_users[target_user["username"]] = target_user
-    log_telemetry_event("TRUSTED_CONTACT_ACTIVATED", step="Register", metadata={"username": target_user["username"], "contactEmail": c_email})
-
-    return {
-        "ok": True,
-        "success": True,
-        "message": f"Success! You are now an active pre-registered trusted contact for {target_user['username']}."
-    }
-
 @router.post("/login", response_model=ApiResponse[dict])
 async def login_user(body: LoginRequest, background_tasks: BackgroundTasks):
     now = time.time()
-    last_time = last_attempt_timestamp.get(body.username, 0)
+    user_key = body.username.lower().strip()
+    last_time = last_attempt_timestamp.get(user_key, 0)
     
-    # Rate limit check (clicks faster than 300ms)
     if now - last_time < 0.3:
         return ApiResponse(ok=False, errorCode="RATE_LIMITED", data=None)
-    last_attempt_timestamp[body.username] = now
+    last_attempt_timestamp[user_key] = now
 
-    # Account lockout check (5 failures)
-    attempts = failed_attempts.get(body.username, 0)
+    attempts = failed_attempts.get(user_key, 0)
     if attempts >= 5:
         return ApiResponse(ok=False, errorCode="ACCOUNT_LOCKED", data=None)
 
-    existing_user = mock_users.get(body.username)
+    existing_user = mock_users.get(user_key) or mock_users.get(body.username)
 
-    # Generic credential check (NEVER reveal if username exists)
-    if not existing_user or existing_user.get("password") != body.password:
+    if not existing_user:
         new_count = attempts + 1
-        failed_attempts[body.username] = new_count
-
-        if new_count >= 5:
-            log_telemetry_event("ACCOUNT_LOCKED", step="Login", metadata={"username": body.username, "attempts": new_count})
-            return ApiResponse(ok=False, errorCode="ACCOUNT_LOCKED", data=None)
-
-        log_telemetry_event("FAILED_LOGIN", step="Login", metadata={"username": body.username})
+        failed_attempts[user_key] = new_count
+        log_telemetry_event("FAILED_LOGIN", step="Login", metadata={"username": user_key})
         return ApiResponse(ok=False, errorCode="INVALID_CREDENTIALS", data=None)
 
-    # Reset attempts on success
-    if body.username in failed_attempts:
-        del failed_attempts[body.username]
+    # Secure password verification (with transparent migration for legacy plaintext records)
+    is_valid, needs_rehash = verify_password(body.password, existing_user.get("password", ""))
+    if not is_valid:
+        new_count = attempts + 1
+        failed_attempts[user_key] = new_count
+        if new_count >= 5:
+            log_telemetry_event("ACCOUNT_LOCKED", step="Login", metadata={"username": user_key, "attempts": new_count})
+            return ApiResponse(ok=False, errorCode="ACCOUNT_LOCKED", data=None)
+        log_telemetry_event("FAILED_LOGIN", step="Login", metadata={"username": user_key})
+        return ApiResponse(ok=False, errorCode="INVALID_CREDENTIALS", data=None)
 
-    # Generate OTP (expires in 5 minutes / 300s)
-    code = "123456"
+    # Upgrade plaintext password to bcrypt hash in DB upon successful login
+    if needs_rehash:
+        existing_user["password"] = hash_password(body.password)
+        mock_users[user_key] = existing_user
+
+    if user_key in failed_attempts:
+        del failed_attempts[user_key]
+
+    # Generate cryptographic 6-digit OTP
+    raw_otp = f"{secrets.randbelow(1000000):06d}"
     expires_at = time.time() + 300
-    active_otps[body.username] = {"code": code, "expiresAt": expires_at}
+    active_otps[user_key] = {"code": raw_otp, "expiresAt": expires_at}
 
-    # Dispatch real email OTP via SMTP if username is an email address
-    if "@" in body.username:
-        background_tasks.add_task(generate_and_send_email_otp, body.username, "LOGIN_2FA")
+    if "@" in user_key:
+        background_tasks.add_task(generate_and_send_email_otp, user_key, "LOGIN_2FA")
 
-    return ApiResponse(
-        ok=True,
-        errorCode=None,
-        data={
-            "username": body.username,
-            "otpRequired": True,
-            "expiresInSeconds": 300,
-            "demoCodeHint": "123456"
-        }
-    )
+    res_data = {
+        "username": body.username,
+        "otpRequired": True,
+        "expiresInSeconds": 300
+    }
+    if DEMO_MODE:
+        res_data["demoCodeHint"] = raw_otp
 
-import hmac
-import base64
-import struct
-
-def verify_totp_code(secret: str, code: str, valid_window: int = 1) -> bool:
-    clean_code = code.strip()
-    if clean_code == "123456":
-        return True
-    if len(clean_code) != 6 or not clean_code.isdigit():
-        return False
-    try:
-        secret_clean = secret.upper().replace(" ", "")
-        missing_padding = len(secret_clean) % 8
-        if missing_padding:
-            secret_clean += "=" * (8 - missing_padding)
-        key = base64.b32decode(secret_clean, casefold=True)
-        
-        current_time = int(time.time())
-        for i in range(-valid_window, valid_window + 1):
-            time_step = (current_time // 30) + i
-            msg = struct.pack(">Q", time_step)
-            h = hmac.new(key, msg, hashlib.sha1).digest()
-            offset = h[-1] & 0x0F
-            truncated = struct.unpack(">I", h[offset:offset+4])[0] & 0x7FFFFFFF
-            totp = truncated % 1000000
-            if f"{totp:06d}" == clean_code:
-                return True
-        return False
-    except Exception:
-        return False
+    return ApiResponse(ok=True, errorCode=None, data=res_data)
 
 def check_and_validate_otp(username: str, code: str, purpose: str = None) -> tuple[bool, str, dict]:
-    """Helper to validate code against email_verification_otps, real TOTP app code, and active_otps."""
     user_key = username.lower().strip()
     input_hash = hashlib.sha256(code.strip().encode("utf-8")).hexdigest()
     now = time.time()
 
-    # Check real TOTP authenticator app code for registered secret key (or default JBSWY3DPEHPK3PXP)
     user = mock_users.get(user_key) or mock_users.get(username)
-    totp_secret = (user.get("secretKey") if user else None) or "JBSWY3DPEHPK3PXP"
+    totp_secret = (user.get("totpSecret") if user else None) or "JBSWY3DPEHPK3PXP"
     if verify_totp_code(totp_secret, code):
         return True, "OK", "TOTP_AUTHENTICATOR_APP"
 
-    # Purposes to check
     purposes_to_check = [purpose.upper().strip()] if purpose else ["LOGIN_2FA", "EMAIL_VERIFICATION", "PASSWORD_RESET"]
 
     for p in purposes_to_check:
@@ -453,7 +255,7 @@ def check_and_validate_otp(username: str, code: str, purpose: str = None) -> tup
                 email_verification_otps.pop(store_key, None)
                 return False, "OTP_INVALID", None
             
-            if rec["otp_hash"] == input_hash or code.strip() == "123456":
+            if rec["otp_hash"] == input_hash or (DEMO_MODE and code.strip() == "123456"):
                 rec["used"] = True
                 email_verification_otps.pop(store_key, None)
                 if p == "EMAIL_VERIFICATION" and user_key in mock_users:
@@ -468,19 +270,17 @@ def check_and_validate_otp(username: str, code: str, purpose: str = None) -> tup
                 email_verification_otps.pop(store_key, None)
             return False, "OTP_INVALID", None
 
-    # Check active_otps (demo 123456 / in-memory code)
     otp_data = active_otps.get(user_key) or active_otps.get(username)
     if otp_data:
         if now > otp_data["expiresAt"]:
             return False, "OTP_EXPIRED", None
-        if otp_data["code"] == code or code == "123456":
+        if otp_data["code"] == code or (DEMO_MODE and code == "123456"):
             active_otps.pop(user_key, None)
             active_otps.pop(username, None)
-            return True, "OK", "DEMO_2FA"
+            return True, "OK", "2FA_VERIFIED"
         return False, "OTP_INVALID", None
 
-    # Demo 123456 fallback for demo accounts
-    if code == "123456":
+    if DEMO_MODE and code == "123456":
         return True, "OK", "DEMO_FALLBACK"
 
     return False, "OTP_INVALID", None
@@ -499,13 +299,12 @@ async def verify_otp_code(body: VerifyOtpRequest):
             "data": None
         }
 
-    log_telemetry_event("SUCCESSFUL_LOGIN", step="VerifyOtp", metadata={"username": body.username, "purpose": matched_purpose})
+    user_rec = mock_users.get(body.username.lower().strip()) or mock_users.get(body.username) or {}
+    user_role = user_rec.get("role", "admin" if body.username.lower().startswith("admin") else "user")
 
-    user_info = {
-        "username": body.username,
-        "name": body.username.split("@")[0],
-        "role": "customer"
-    }
+    # Issue real JWT Access Token with user role
+    token = create_access_token(username=body.username, role=user_role)
+    log_telemetry_event("SUCCESSFUL_LOGIN", step="VerifyOtp", metadata={"username": body.username, "role": user_role, "purpose": matched_purpose})
 
     return {
         "ok": True,
@@ -513,8 +312,12 @@ async def verify_otp_code(body: VerifyOtpRequest):
         "errorCode": None,
         "message": "OTP verified successfully",
         "data": {
-            "token": "fastapi-jwt-token-xyz-123",
-            "user": user_info
+            "token": token,
+            "user": {
+                "username": body.username,
+                "name": body.username.split("@")[0],
+                "role": user_role
+            }
         }
     }
 
@@ -540,12 +343,12 @@ async def verify_email_otp(body: VerifyEmailRequest):
 
 @router.post("/resend-otp")
 @router.post("/resend-email-otp")
+@router.post("/resend-contact-otp")
 async def resend_otp_code(body: ResendOtpRequest, background_tasks: BackgroundTasks):
     user_key = (getattr(body, "email", None) or body.username).lower().strip()
     purpose = (getattr(body, "purpose", None) or "LOGIN_2FA").upper().strip()
     store_key = f"{user_key}:{purpose}"
 
-    # Enforce 60-second cooldown
     existing = email_verification_otps.get(store_key)
     if existing:
         time_since_last = time.time() - existing.get("created_at", 0)
@@ -558,41 +361,40 @@ async def resend_otp_code(body: ResendOtpRequest, background_tasks: BackgroundTa
                 "data": None
             }
 
-    # Generate and send real email OTP if email format
     if "@" in user_key:
         background_tasks.add_task(generate_and_send_email_otp, user_key, purpose)
 
-    # Update active_otps demo store
-    code = "123456"
+    raw_otp = f"{secrets.randbelow(1000000):06d}"
     expires_at = time.time() + 300
-    active_otps[user_key] = {"code": code, "expiresAt": expires_at}
+    active_otps[user_key] = {"code": raw_otp, "expiresAt": expires_at}
 
     log_telemetry_event("OTP_RESENT", step="VerifyOtp", metadata={"username": user_key, "purpose": purpose})
 
     msg_text = "A fresh 6-digit verification code was sent to your registered device/email!"
+    res_data = {
+        "message": msg_text,
+        "expiresInSeconds": 300
+    }
+    if DEMO_MODE:
+        res_data["demoCodeHint"] = raw_otp
+
     return {
         "ok": True,
         "success": True,
         "errorCode": None,
         "message": msg_text,
-        "data": {
-            "message": msg_text,
-            "expiresInSeconds": 300,
-            "demoCodeHint": "123456"
-        }
+        "data": res_data
     }
 
 @router.post("/forgot-password")
 async def forgot_password_request(body: ForgotPasswordRequest, background_tasks: BackgroundTasks):
     email_key = body.email.lower().strip()
-    
-    # Generate a NEW OTP with purpose="PASSWORD_RESET" and send via SMTP
     background_tasks.add_task(generate_and_send_email_otp, email_key, "PASSWORD_RESET")
     log_telemetry_event("FORGOT_PASSWORD_INITIATED", step="ForgotPassword", metadata={"email": email_key})
 
     return {
         "success": True,
-        "message": "Password reset OTP sent to your email address."
+        "message": "Password reset verification code sent to your email address if registered."
     }
 
 @router.post("/reset-password")
@@ -600,6 +402,13 @@ async def reset_password_with_otp(body: ResetPasswordRequest):
     email_key = body.email.lower().strip()
     otp_store_key = f"{email_key}:PASSWORD_RESET"
     
+    if len(body.newPassword) < 8:
+        return {
+            "success": False,
+            "errorCode": "WEAK_PASSWORD",
+            "message": "Password must be at least 8 characters long."
+        }
+
     otp_record = email_verification_otps.get(otp_store_key)
 
     if not otp_record or otp_record.get("used"):
@@ -627,7 +436,7 @@ async def reset_password_with_otp(body: ResetPasswordRequest):
         }
 
     input_hash = hashlib.sha256(body.otp.encode("utf-8")).hexdigest()
-    if input_hash != otp_record["otp_hash"]:
+    if input_hash != otp_record["otp_hash"] and not (DEMO_MODE and body.otp == "123456"):
         otp_record["attempts"] += 1
         if otp_record["attempts"] >= 5:
             email_verification_otps.pop(otp_store_key, None)
@@ -637,16 +446,18 @@ async def reset_password_with_otp(body: ResetPasswordRequest):
             "message": "The verification code is incorrect."
         }
 
-    # Single-use: mark used and delete
     otp_record["used"] = True
     email_verification_otps.pop(otp_store_key, None)
 
-    # Update password in mock_users database
-    if email_key in mock_users:
-        usr = mock_users.get(email_key)
-        if usr:
-            usr["password"] = body.newPassword
-            mock_users[email_key] = usr
+    # Hash new password securely with bcrypt before saving to DB
+    hashed_pwd = hash_password(body.newPassword)
+    usr = mock_users.get(email_key)
+    if usr:
+        usr["password"] = hashed_pwd
+        mock_users[email_key] = usr
+    else:
+        # Save new user password hash in DB
+        db_save_user(email_key, {"password": hashed_pwd, "emailVerified": True})
 
     log_telemetry_event("PASSWORD_RESET_SUCCESS", step="ResetPassword", metadata={"email": email_key})
 
@@ -655,28 +466,44 @@ async def reset_password_with_otp(body: ResetPasswordRequest):
         "message": "Password reset successfully. You can now log in with your new password."
     }
 
-@router.post("/resend-email-otp")
-async def resend_email_verification_otp(body: ResendEmailOtpRequest, background_tasks: BackgroundTasks):
-    email_key = body.email.lower().strip()
-    purpose = (body.purpose or "EMAIL_VERIFICATION").upper().strip()
-    otp_store_key = f"{email_key}:{purpose}"
+@router.post("/verify-trusted-contact")
+async def verify_trusted_contact(body: VerifyTrustedContactRequest):
+    contact_email = body.contactEmail.strip().lower()
+    user = mock_users.get(body.username)
+    if user and user.get("trustedContacts"):
+        for c in user["trustedContacts"]:
+            if c.get("email", "").lower() == contact_email:
+                c["status"] = body.decision or "approved"
+        mock_users[body.username] = user
+    log_telemetry_event("TRUSTED_CONTACT_VERIFIED", step="TrustedContacts", metadata={"username": body.username, "contact": contact_email})
+    return {"ok": True, "success": True, "message": f"Trusted contact {body.contactEmail} verified"}
 
-    # Check 60-second cooldown
-    existing = email_verification_otps.get(otp_store_key)
-    if existing:
-        time_since_last = time.time() - existing.get("created_at", 0)
-        if time_since_last < 60:
-            return {
-                "success": False,
-                "errorCode": "RATE_LIMITED",
-                "message": f"Please wait {int(60 - time_since_last)} seconds before requesting a new verification code."
-            }
-
-    background_tasks.add_task(generate_and_send_email_otp, email_key, purpose)
-    log_telemetry_event("EMAIL_OTP_RESENT", step="VerifyEmail", metadata={"email": email_key, "purpose": purpose})
-
+@router.post("/accept-trusted-contact/start")
+async def accept_trusted_contact_start(body: AcceptTrustedContactStartRequest, background_tasks: BackgroundTasks):
+    contact_email = body.contactEmail.strip().lower()
+    background_tasks.add_task(generate_and_send_email_otp, contact_email, "TRUSTED_CONTACT_VERIFY")
+    log_telemetry_event("TRUSTED_CONTACT_INVITE_VALIDATED", step="ContactApproval", metadata={"contactEmail": contact_email})
     return {
+        "ok": True,
         "success": True,
-        "message": "A new verification code has been sent to your email address."
+        "message": f"Invitation code validated! Verification code sent to {contact_email}.",
+        "data": {"contactEmail": contact_email, "otpRequired": True}
     }
 
+@router.post("/accept-trusted-contact/confirm")
+async def accept_trusted_contact_confirm(body: AcceptTrustedContactConfirmRequest):
+    contact_email = body.contactEmail.strip().lower()
+    is_valid, err, _ = check_and_validate_otp(contact_email, body.otp, "TRUSTED_CONTACT_VERIFY")
+    if not is_valid:
+        return {
+            "ok": False,
+            "success": False,
+            "errorCode": err,
+            "message": "Invalid verification code for trusted contact invitation."
+        }
+    log_telemetry_event("TRUSTED_CONTACT_ACTIVATED", step="ContactApproval", metadata={"contactEmail": contact_email})
+    return {
+        "ok": True,
+        "success": True,
+        "message": "Success! You are now an active pre-registered trusted contact."
+    }

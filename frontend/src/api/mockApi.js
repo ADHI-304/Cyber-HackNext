@@ -27,8 +27,19 @@ let loggedEvents = [
 
 async function apiFetch(endpoint, options = {}) {
   try {
+    const headers = { 'Content-Type': 'application/json', ...(options.headers || {}) };
+    let savedUserStr = null;
+    try {
+      savedUserStr = sessionStorage.getItem('authbuddy_user') || localStorage.getItem('authbuddy_user');
+    } catch (e) {}
+    if (savedUserStr) {
+      const parsed = JSON.parse(savedUserStr);
+      if (parsed?.token) {
+        headers['Authorization'] = `Bearer ${parsed.token}`;
+      }
+    }
     const res = await fetch(`${BACKEND_URL}${endpoint}`, {
-      headers: { 'Content-Type': 'application/json', ...(options.headers || {}) },
+      headers,
       ...options
     });
     return await res.json();

@@ -15,6 +15,8 @@ import { ResetPassword } from './pages/ResetPassword';
 import { ContactApproval } from './pages/ContactApproval';
 import { AdminFriction } from './pages/AdminFriction';
 
+import { ProtectedRoute } from './components/ProtectedRoute';
+
 export function App() {
   return (
     <A11yProvider>
@@ -34,12 +36,14 @@ export function App() {
                 <Route path="/login" element={<Login />} />
                 <Route path="/register" element={<Register />} />
                 <Route path="/verify-otp" element={<VerifyOtp />} />
-                <Route path="/dashboard" element={<Dashboard />} />
+                <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
                 <Route path="/recovery-start" element={<RecoveryStart />} />
                 <Route path="/recovery-status" element={<RecoveryStatus />} />
                 <Route path="/reset-password" element={<ResetPassword />} />
                 <Route path="/contact-approval" element={<ContactApproval />} />
-                <Route path="/admin-friction" element={<AdminFriction />} />
+                <Route path="/admin-friction" element={<ProtectedRoute requireAdmin={true}><AdminFriction /></ProtectedRoute>} />
+                <Route path="/admin" element={<ProtectedRoute requireAdmin={true}><AdminFriction /></ProtectedRoute>} />
+                <Route path="/admin-analytics" element={<ProtectedRoute requireAdmin={true}><AdminFriction /></ProtectedRoute>} />
                 <Route path="*" element={<Navigate to="/login" replace />} />
               </Routes>
             </div>

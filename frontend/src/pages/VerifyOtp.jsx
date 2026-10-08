@@ -39,21 +39,29 @@ export function VerifyOtp() {
     return () => clearInterval(interval);
   }, [timerSeconds, addStrugglePoints]);
 
-  const handleVerify = async (otpToVerify = code) => {
-    if (otpToVerify.length < 6) {
+  const handleVerify = async (otpToVerify) => {
+    const targetCode = (typeof otpToVerify === 'string' && otpToVerify.length > 0) ? otpToVerify : code;
+    if (!targetCode || targetCode.length < 6) {
       addStrugglePoints(1, 'incomplete_otp');
-      setErrorCode('OTP_INVALID');
+      setErrorCode('OTP_INCOMPLETE');
       return;
     }
 
     setErrorCode(null);
     setIsLoading(true);
-    const res = await verifyOtp(username, otpToVerify);
+    const res = await verifyOtp(username, targetCode);
     setIsLoading(false);
 
     if (res && (res.ok || res.success)) {
-      completeLogin(res.data?.user || { username, name: username.split('@')[0], role: 'customer' });
-      navigate('/dashboard');
+      const userObj = res.data?.user || { username, name: username.split('@')[0], role: username.toLowerCase().startsWith('admin') ? 'admin' : 'user' };
+      const tokenVal = res.data?.token || res.token;
+      const fullUserData = { ...userObj, token: tokenVal };
+      completeLogin(fullUserData);
+      if (userObj.role === 'admin') {
+        navigate('/admin-friction');
+      } else {
+        navigate('/dashboard');
+      }
     } else {
       addStrugglePoints(2, 'failed_otp_attempt');
       setErrorCode(res?.errorCode || 'OTP_INVALID');

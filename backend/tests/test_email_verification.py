@@ -93,7 +93,9 @@ def test_forgot_password_and_reset_flow():
     })
     assert reset_res.status_code == 200
     assert reset_res.json()["success"] is True
-    assert mock_users[test_email]["password"] == "BrandNewPassword123!"
+    from app.services.security import verify_password
+    is_valid, _ = verify_password("BrandNewPassword123!", mock_users[test_email]["password"])
+    assert is_valid is True
 
 def test_resend_cooldown():
     test_email = "cooldown_test@gmail.com"
