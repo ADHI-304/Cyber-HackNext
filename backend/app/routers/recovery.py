@@ -51,24 +51,59 @@ def get_user_preregistered_contacts(username: str) -> list:
         })
     return session_contacts
 
+def mask_phone_number(phone_str: str) -> str:
+    if not phone_str:
+        return "+91 ******1234"
+    clean = phone_str.strip()
+    if len(clean) >= 10:
+        prefix = clean[:3] if clean.startswith("+") else clean[:2]
+        suffix = clean[-4:]
+        return f"{prefix} ******{suffix}"
+    return "+91 ******1234"
+
 @router.post("/request-phone-otp", response_model=ApiResponse[dict])
 async def request_phone_recovery_otp(body: PhoneRecoveryRequest):
-    phone = body.phone or "+91 ******1234"
     username = (body.username or "user@securebank.com").lower().strip()
     
+    # Retrieve user from database
+    user = mock_users.get(username)
+    
+    # Require phone_verified = true
+    if not user or not user.get("phoneVerified"):
+        # For default demo account user@securebank.com, ensure phoneVerified is true with default phone if not set
+        if username in ["user@securebank.com", "demo"] and user:
+            user["phoneVerified"] = True
+            user["phoneNumber"] = user.get("phoneNumber") or "+919876543210"
+            mock_users[username] = user
+        else:
+            return ApiResponse(
+                ok=False,
+                errorCode="PHONE_NOT_VERIFIED",
+                data={
+                    "success": False,
+                    "message": "No verified phone number found for this account. Please use an alternative recovery method."
+                }
+            )
+
+    registered_phone = user.get("phoneNumber") or "+919876543210"
+    masked_phone = mask_phone_number(registered_phone)
+
+    # Generate NEW single-use recovery OTP
     code = "123456"
+    store_key = f"{username}:PHONE_RECOVERY"
     active_otps[username] = {"code": code, "expiresAt": time.time() + 300}
-    
-    log_telemetry_event("PHONE_RECOVERY_OTP_SENT", step="Recovery", metadata={"username": username, "phone": phone})
+
+    log_telemetry_event("PHONE_RECOVERY_OTP_SENT", step="Recovery", metadata={"username": username, "maskedPhone": masked_phone})
     print(f"\n=======================================================")
-    print(f"[PHONE RECOVERY OTP] Username: {username} | Phone: {phone} | Code: {code}")
+    print(f"[PHONE RECOVERY OTP] Username: {username} | Masked Phone: {masked_phone} | Code: {code}")
     print(f"=======================================================\n")
-    
+
     return ApiResponse(
         ok=True,
         errorCode=None,
         data={
-            "message": f"6-digit verification code sent to registered phone {phone}",
+            "message": f"6-digit verification code sent to registered phone {masked_phone}",
+            "maskedPhone": masked_phone,
             "demoCodeHint": "123456"
         }
     )
@@ -77,7 +112,7 @@ async def request_phone_recovery_otp(body: PhoneRecoveryRequest):
 async def verify_phone_recovery_otp(body: VerifyPhoneRecoveryRequest):
     username = (body.username or "user@securebank.com").lower().strip()
     code = body.code.strip()
-    
+
     otp_data = active_otps.get(username)
     if code == "123456" or (otp_data and otp_data["code"] == code):
         if username in active_otps:
@@ -88,7 +123,7 @@ async def verify_phone_recovery_otp(body: VerifyPhoneRecoveryRequest):
             errorCode=None,
             data={"success": True, "message": "Phone verification successful. You can now reset your password."}
         )
-    
+
     return ApiResponse(
         ok=False,
         errorCode="OTP_INVALID",
@@ -136,12 +171,48 @@ async def verify_email_recovery_otp(body: VerifyEmailRecoveryRequest):
         data={"success": False, "message": "The recovery email code is incorrect or expired."}
     )
 
+import hmac
+import hashlib
+import base64
+import struct
+
+def verify_totp_code(secret: str, code: str, valid_window: int = 1) -> bool:
+    clean_code = code.strip()
+    if clean_code == "123456":
+        return True
+    if len(clean_code) != 6 or not clean_code.isdigit():
+        return False
+    try:
+        secret_clean = secret.upper().replace(" ", "")
+        missing_padding = len(secret_clean) % 8
+        if missing_padding:
+            secret_clean += "=" * (8 - missing_padding)
+        key = base64.b32decode(secret_clean, casefold=True)
+        
+        current_time = int(time.time())
+        for i in range(-valid_window, valid_window + 1):
+            time_step = (current_time // 30) + i
+            msg = struct.pack(">Q", time_step)
+            h = hmac.new(key, msg, hashlib.sha1).digest()
+            offset = h[-1] & 0x0F
+            truncated = struct.unpack(">I", h[offset:offset+4])[0] & 0x7FFFFFFF
+            totp = truncated % 1000000
+            if f"{totp:06d}" == clean_code:
+                return True
+        return False
+    except Exception:
+        return False
+
 @router.post("/verify-totp", response_model=ApiResponse[dict])
 async def verify_totp_recovery(body: VerifyTotpRecoveryRequest):
     username = (body.username or "user@securebank.com").lower().strip()
     code = body.code.strip()
     
-    if len(code) == 6 and (code == "123456" or code.isdigit()):
+    # Retrieve user's secret or default JBSWY3DPEHPK3PXP
+    user = mock_users.get(username)
+    totp_secret = (user.get("secretKey") if user else None) or "JBSWY3DPEHPK3PXP"
+    
+    if verify_totp_code(totp_secret, code):
         log_telemetry_event("TOTP_RECOVERY_SUCCESS", step="Recovery", metadata={"username": username})
         return ApiResponse(
             ok=True,

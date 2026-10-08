@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { t as i18nT, languages, speechVoiceMap } from '../i18n';
 
 const STORAGE_KEY = 'authbuddy_a11y_prefs';
 
@@ -6,6 +7,7 @@ const defaultPrefs = {
   textSize: 'base', // 'sm', 'base', 'lg', 'xl'
   highContrast: false,
   voiceGuidance: false,
+  language: 'en', // Default language: English
 };
 
 export const A11yContext = createContext(null);
@@ -29,46 +31,46 @@ export function A11yProvider({ children }) {
       console.warn('Failed to save a11y preferences to localStorage', e);
     }
 
-    // Apply root document classes for styling
     const root = document.documentElement;
 
-    // Text size classes
     ['text-size-sm', 'text-size-base', 'text-size-lg', 'text-size-xl'].forEach(cls => {
       root.classList.remove(cls);
     });
     root.classList.add(`text-size-${prefs.textSize}`);
 
-    // High contrast class
     if (prefs.highContrast) {
       root.classList.add('high-contrast');
     } else {
       root.classList.remove('high-contrast');
     }
+
+    root.setAttribute('lang', prefs.language || 'en');
   }, [prefs]);
 
-  const setTextSize = (size) => {
-    setPrefs(prev => ({ ...prev, textSize: size }));
-  };
+  const setTextSize = (size) => setPrefs(prev => ({ ...prev, textSize: size }));
+  const toggleHighContrast = () => setPrefs(prev => ({ ...prev, highContrast: !prev.highContrast }));
+  const toggleVoiceGuidance = () => setPrefs(prev => ({ ...prev, voiceGuidance: !prev.voiceGuidance }));
+  const setLanguage = (lang) => setPrefs(prev => ({ ...prev, language: lang }));
+  const resetA11yPrefs = () => setPrefs(defaultPrefs);
 
-  const toggleHighContrast = () => {
-    setPrefs(prev => ({ ...prev, highContrast: !prev.highContrast }));
-  };
+  const translate = useCallback((key, params) => {
+    return i18nT(prefs.language || 'en', key, params);
+  }, [prefs.language]);
 
-  const toggleVoiceGuidance = () => {
-    setPrefs(prev => ({ ...prev, voiceGuidance: !prev.voiceGuidance }));
-  };
-
-  const resetA11yPrefs = () => {
-    setPrefs(defaultPrefs);
-  };
+  const voiceCode = speechVoiceMap[prefs.language] || 'en-IN';
 
   return (
     <A11yContext.Provider
       value={{
         prefs,
+        language: prefs.language || 'en',
+        languages,
+        voiceCode,
+        t: translate,
         setTextSize,
         toggleHighContrast,
         toggleVoiceGuidance,
+        setLanguage,
         resetA11yPrefs,
       }}
     >

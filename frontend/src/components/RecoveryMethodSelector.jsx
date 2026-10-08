@@ -1,40 +1,58 @@
 import React from 'react';
-import { Smartphone, Mail, KeyRound, AlertOctagon, ArrowRight } from 'lucide-react';
+import { useA11yPrefs } from '../context/A11yContext';
+import { Smartphone, Mail, KeyRound, AlertOctagon, ArrowRight, User } from 'lucide-react';
 
-export function RecoveryMethodSelector({ onSelectMethod }) {
+export function RecoveryMethodSelector({ username, setUsername, onSelectMethod }) {
+  const { t } = useA11yPrefs();
+
   const methods = [
     {
       id: 'phone',
       icon: Smartphone,
-      title: 'Registered phone',
-      desc: 'Receive a 6-digit verification code at +91 ******1234.',
+      title: t('recoveryPhoneTitle'),
+      desc: `${t('recoveryPhoneDesc')} your verified phone number.`,
       color: 'text-sky-600 bg-sky-100'
     },
     {
       id: 'email',
       icon: Mail,
-      title: 'Recovery email',
-      desc: 'Receive a secure verification link at a******@gmail.com.',
+      title: t('recoveryEmailTitle'),
+      desc: `${t('recoveryEmailDesc')} ${username || 'your email'}.`,
       color: 'text-purple-600 bg-purple-100'
     },
     {
       id: 'totp',
       icon: KeyRound,
-      title: 'Authenticator app',
-      desc: 'Use a 6-digit code from Google Authenticator or 1Password.',
+      title: t('recoveryTotpTitle'),
+      desc: t('recoveryTotpDesc'),
       color: 'text-amber-600 bg-amber-100'
     }
   ];
 
   return (
     <div className="space-y-4">
-      <div className="text-center space-y-1 mb-5">
+      <div className="text-center space-y-1 mb-4">
         <h1 className="text-2xl font-extrabold text-slate-900 high-contrast:text-white">
-          🔐 Account Recovery
+          {t('recoveryTitle')}
         </h1>
         <p className="text-xs font-medium text-slate-600 max-w-sm mx-auto leading-relaxed high-contrast:text-slate-300">
-          Let's help you recover your account. First, choose which verification method you still have access to.
+          {t('recoverySubtitle')}
         </p>
+      </div>
+
+      <div className="bg-sky-50/70 border border-sky-200 rounded-2xl p-3.5 space-y-1 high-contrast:bg-slate-800">
+        <label htmlFor="rec-user-input" className="block text-xs font-bold text-slate-800 high-contrast:text-amber-400 flex items-center gap-1">
+          <User className="w-3.5 h-3.5 text-sky-600" /> {t('usernameLabel')}
+        </label>
+        <input
+          id="rec-user-input"
+          type="text"
+          required
+          value={username}
+          onChange={(e) => setUsername(e.target.value)}
+          placeholder="you@example.com"
+          className="w-full min-h-[40px] px-3 py-2 rounded-xl border border-slate-300 font-semibold text-xs text-slate-900 bg-white focus:ring-2 focus:ring-sky-500 high-contrast:bg-slate-900 high-contrast:text-white"
+        />
       </div>
 
       <div className="space-y-2">
@@ -64,22 +82,21 @@ export function RecoveryMethodSelector({ onSelectMethod }) {
         })}
       </div>
 
-      {/* "I can't access any of these" Button */}
-      <div className="pt-3 border-t border-slate-200">
+      <div className="pt-2 border-t border-slate-200">
         <button
           type="button"
           onClick={() => onSelectMethod('contacts')}
-          className="w-full p-3.5 bg-purple-50 border-2 border-purple-300 text-purple-950 hover:bg-purple-100 rounded-2xl text-left flex items-start gap-3 transition-colors high-contrast:bg-slate-800 high-contrast:border-purple-400 high-contrast:text-white"
+          className="w-full p-3 bg-purple-50 border-2 border-purple-300 text-purple-950 hover:bg-purple-100 rounded-2xl text-left flex items-start gap-3 transition-colors high-contrast:bg-slate-800 high-contrast:border-purple-400 high-contrast:text-white"
         >
-          <div className="p-2.5 rounded-xl bg-purple-600 text-white shrink-0">
-            <AlertOctagon className="w-5 h-5" />
+          <div className="p-2 rounded-xl bg-purple-600 text-white shrink-0">
+            <AlertOctagon className="w-4 h-4" />
           </div>
           <div>
-            <h2 className="font-bold text-sm text-purple-900 high-contrast:text-amber-400 flex items-center gap-1">
-              <span>🆘 I can't access any of these</span>
+            <h2 className="font-bold text-xs text-purple-900 high-contrast:text-amber-400 flex items-center gap-1">
+              <span>🆘 {t('noAccessContacts')}</span>
             </h2>
-            <p className="text-xs text-purple-800 mt-0.5 high-contrast:text-slate-200">
-              Lost phone & methods? Start 2-of-3 Trusted Contact recovery.
+            <p className="text-[11px] text-purple-800 mt-0.5 high-contrast:text-slate-200 leading-tight">
+              {t('guidanceNoAccessText')}
             </p>
           </div>
         </button>

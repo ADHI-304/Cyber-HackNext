@@ -1,16 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate, Link } from 'react-router-dom';
 import { getRecoveryStatus, approveRecovery } from '../api/mockApi';
+import { useA11yPrefs } from '../context/A11yContext';
 import { ContactCard } from '../components/ContactCard';
 import { RecoveryProgressCards } from '../components/RecoveryProgressCards';
 import { AuthBuddyGuidance } from '../components/AuthBuddyGuidance';
 import { HelpPanel } from '../components/HelpPanel';
 import { useStruggleScore } from '../hooks/useStruggleScore';
-import { UserCheck, CheckCircle, Smartphone, ExternalLink, BellRing } from 'lucide-react';
+import { UserCheck, CheckCircle, Smartphone, ExternalLink } from 'lucide-react';
 
 export function RecoveryStatus() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const { t } = useA11yPrefs();
   const recoveryId = searchParams.get('id') || 'rec_demo';
 
   const { score, addStrugglePoints, resetScore, activeHelpMode, setActiveHelpMode } = useStruggleScore('RecoveryStatus');
@@ -57,7 +59,6 @@ export function RecoveryStatus() {
     <main id="main-content" className="min-h-[85vh] py-8 px-4 max-w-2xl mx-auto space-y-6">
       <div className="bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 shadow-xl space-y-6 high-contrast:bg-slate-900 high-contrast:border-amber-400">
         
-        {/* AuthBuddy Universal Contextual Guidance Component */}
         <AuthBuddyGuidance guidanceKey="RECOVERY_PENDING" />
 
         <div className="text-center space-y-2">
@@ -65,10 +66,10 @@ export function RecoveryStatus() {
             <UserCheck className="w-6 h-6" />
           </div>
           <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 high-contrast:text-white">
-            Secure Recovery Progress
+            {t('recoveryPendingTitle')}
           </h1>
           <p className="text-sm font-medium text-slate-600 max-w-lg mx-auto leading-relaxed high-contrast:text-slate-300">
-            Account recovery for <strong className="text-slate-900 high-contrast:text-amber-400">{session?.username || 'user@securebank.com'}</strong>
+            {t('recoveryPendingDesc')}
           </p>
         </div>
 
@@ -76,8 +77,8 @@ export function RecoveryStatus() {
 
         <div className="space-y-3">
           <div className="flex items-center justify-between">
-            <h2 className="text-sm font-bold text-slate-900 high-contrast:text-amber-400">Approval Status per Contact</h2>
-            <span className="text-xs text-slate-500">Click below to simulate approval</span>
+            <h2 className="text-sm font-bold text-slate-900 high-contrast:text-amber-400">{t('approvalsNeeded')}</h2>
+            <span className="text-xs text-slate-500">Simulate approvals below</span>
           </div>
 
           {session?.contacts?.map((c, index) => (
@@ -111,7 +112,7 @@ export function RecoveryStatus() {
             }`}
           >
             <Smartphone className="w-5 h-5" />
-            <span>{isApprovedRequired ? 'Approvals Met: Set Up New Device Now' : !mandatoryApproved ? 'Waiting for Contact 1 (Mandatory Primary) approval...' : `Waiting for ${requiredCount - approvedCount} more approval(s)...`}</span>
+            <span>{isApprovedRequired ? t('setUpNewDevice') : !mandatoryApproved ? t('contact1Status') : `${requiredCount - approvedCount} more approval(s) needed`}</span>
           </button>
         </div>
       </div>

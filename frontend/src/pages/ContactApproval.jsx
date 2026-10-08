@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
 import { acceptTrustedContactStart, acceptTrustedContactConfirm } from '../api/mockApi';
+import { useA11yPrefs } from '../context/A11yContext';
 import { AuthBuddyGuidance } from '../components/AuthBuddyGuidance';
 import { ShieldCheck, CheckCircle2, ArrowRight, KeyRound, Mail } from 'lucide-react';
 
 export function ContactApproval() {
-  const [step, setStep] = useState('CODE_ENTRY'); // 'CODE_ENTRY' | 'OTP_ENTRY' | 'ACTIVE_SUCCESS'
+  const { t } = useA11yPrefs();
+  const [step, setStep] = useState('CODE_ENTRY');
   const [contactEmail, setContactEmail] = useState('');
   const [invitationCode, setInvitationCode] = useState('');
   const [otp, setOtp] = useState('');
@@ -57,7 +59,7 @@ export function ContactApproval() {
           </div>
 
           <h1 className="text-2xl font-extrabold text-slate-900 high-contrast:text-white">
-            Accept Trusted Contact Invitation
+            {t('acceptContactTitle')}
           </h1>
 
           {errorMsg && (
@@ -69,10 +71,10 @@ export function ContactApproval() {
           {step === 'CODE_ENTRY' ? (
             <form onSubmit={handleValidateCode} className="space-y-4 text-left">
               <p className="text-xs text-slate-600 font-medium text-center">
-                Enter your invitation code received via email to accept becoming a trusted recovery contact.
+                {t('acceptContactSubtitle')}
               </p>
               <div>
-                <label className="block text-xs font-bold text-slate-800 mb-1">Your Email Address</label>
+                <label className="block text-xs font-bold text-slate-800 mb-1">{t('contactEmailLabel')}</label>
                 <div className="relative">
                   <input type="email" required value={contactEmail} onChange={(e) => setContactEmail(e.target.value)} placeholder="you@example.com" className="w-full min-h-[44px] px-3 pl-9 rounded-xl border border-slate-300 text-xs font-semibold focus:ring-2 focus:ring-purple-500" />
                   <Mail className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
@@ -80,40 +82,40 @@ export function ContactApproval() {
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-800 mb-1">Invitation Code</label>
+                <label className="block text-xs font-bold text-slate-800 mb-1">{t('invitationCodeLabel')}</label>
                 <div className="relative">
-                  <input type="text" required value={invitationCode} onChange={(e) => setInvitationCode(e.target.value)} placeholder="e.g. 123456" className="w-full min-h-[44px] px-3 pl-9 rounded-xl border border-slate-300 text-xs font-bold tracking-wider uppercase focus:ring-2 focus:ring-purple-500" />
+                  <input type="text" required value={invitationCode} onChange={(e) => setInvitationCode(e.target.value)} placeholder={t('invitationCodePlaceholder')} className="w-full min-h-[44px] px-3 pl-9 rounded-xl border border-slate-300 text-xs font-bold tracking-wider uppercase focus:ring-2 focus:ring-purple-500" />
                   <KeyRound className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
                 </div>
               </div>
 
               <button type="submit" disabled={isLoading} className="w-full min-h-[48px] py-3 bg-purple-700 text-white font-bold text-sm rounded-xl hover:bg-purple-800 shadow flex items-center justify-center gap-2">
-                {isLoading ? <span>Validating Code...</span> : <><span>Validate Invitation Code</span><ArrowRight className="w-4 h-4" /></>}
+                {isLoading ? <span>Validating Code...</span> : <><span>{t('validateCodeButton')}</span><ArrowRight className="w-4 h-4" /></>}
               </button>
             </form>
           ) : step === 'OTP_ENTRY' ? (
             <form onSubmit={handleConfirmOtp} className="space-y-4 text-left">
               <div className="bg-purple-50 border border-purple-200 p-3 rounded-xl text-xs text-purple-900 font-medium">
-                Invitation validated for user <strong>{targetUsername}</strong>! A 6-digit verification code was sent to <strong>{contactEmail}</strong>.
+                {t('enterEmailOtpSubtitle')} (<strong>{contactEmail}</strong>)
               </div>
               <div>
-                <label className="block text-xs font-bold text-slate-800 mb-1">6-Digit Email Verification Code</label>
+                <label className="block text-xs font-bold text-slate-800 mb-1">{t('enter6DigitCode')}</label>
                 <input type="text" maxLength={6} required value={otp} onChange={(e) => setOtp(e.target.value)} placeholder="123456" className="w-full min-h-[44px] px-3 rounded-xl border border-slate-300 text-center text-lg font-mono font-bold tracking-widest focus:ring-2 focus:ring-purple-500" />
               </div>
 
               <div className="flex gap-2">
                 <button type="button" onClick={() => setStep('CODE_ENTRY')} className="px-4 text-xs font-bold text-slate-600 border rounded-xl">Back</button>
                 <button type="submit" disabled={isLoading} className="flex-1 min-h-[48px] py-3 bg-emerald-600 text-white font-bold text-sm rounded-xl hover:bg-emerald-700 shadow flex items-center justify-center gap-2">
-                  {isLoading ? <span>Activating...</span> : <><span>Verify & Activate Trusted Contact</span><CheckCircle2 className="w-4 h-4" /></>}
+                  {isLoading ? <span>Activating...</span> : <><span>{t('confirmActivationButton')}</span><CheckCircle2 className="w-4 h-4" /></>}
                 </button>
               </div>
             </form>
           ) : (
             <div className="bg-emerald-50 border border-emerald-300 text-emerald-900 p-6 rounded-2xl space-y-3 text-center">
               <CheckCircle2 className="w-12 h-12 text-emerald-600 mx-auto" />
-              <h2 className="font-extrabold text-lg">Trusted Contact Active!</h2>
+              <h2 className="font-extrabold text-lg">{t('activeVerified')}</h2>
               <p className="text-xs font-medium leading-relaxed">
-                Thank you! You are now an active pre-registered trusted contact for <strong>{targetUsername}</strong>. You may now close this page.
+                Thank you! You are now an active pre-registered trusted contact for <strong>{targetUsername}</strong>.
               </p>
             </div>
           )}

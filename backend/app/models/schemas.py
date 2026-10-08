@@ -17,8 +17,17 @@ class TrustedContactModel(BaseModel):
 class RegisterRequest(BaseModel):
     username: str
     password: str
+    phone: Optional[str] = None
     accessibilityProfile: Optional[Dict[str, Any]] = None
     trustedContacts: Optional[List[TrustedContactModel]] = None
+
+class SendRegistrationPhoneOtpRequest(BaseModel):
+    phone: str
+
+class VerifyRegistrationPhoneRequest(BaseModel):
+    username: str
+    phone: str
+    otp: str
 
 class LoginRequest(BaseModel):
     username: str

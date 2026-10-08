@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { startRecovery } from '../api/mockApi';
+import { useA11yPrefs } from '../context/A11yContext';
 import { ContactCard } from '../components/ContactCard';
 import { HelpPanel } from '../components/HelpPanel';
 import { RecoveryMethodSelector } from '../components/RecoveryMethodSelector';
@@ -11,22 +12,17 @@ import { ShieldAlert, ArrowRight } from 'lucide-react';
 
 export function RecoveryStart() {
   const navigate = useNavigate();
+  const { t } = useA11yPrefs();
   const { score, addStrugglePoints, resetScore, activeHelpMode, setActiveHelpMode } = useStruggleScore('RecoveryStart');
 
   const [selectedMethod, setSelectedMethod] = useState(null);
-  const [username, setUsername] = useState('user@securebank.com');
-  const [contacts, setContacts] = useState([
+  const [username, setUsername] = useState(() => localStorage.getItem('authbuddy_last_username') || 'user@securebank.com');
+  const [contacts] = useState([
     { name: 'Arun', email: 'arun@example.com', status: 'pending' },
     { name: 'Priya', email: 'priya@example.com', status: 'pending' },
     { name: 'Rahul', email: 'rahul@example.com', status: 'pending' }
   ]);
   const [isLoading, setIsLoading] = useState(false);
-
-  const handleContactChange = (index, field, value) => {
-    const updated = [...contacts];
-    updated[index][field] = value;
-    setContacts(updated);
-  };
 
   const handleStartRecoverySubmit = async (e) => {
     e.preventDefault();
@@ -45,10 +41,10 @@ export function RecoveryStart() {
         {selectedMethod === null ? (
           <>
             <AuthBuddyGuidance guidanceKey="RECOVERY_METHOD_SELECTION" />
-            <RecoveryMethodSelector onSelectMethod={setSelectedMethod} />
+            <RecoveryMethodSelector username={username} setUsername={setUsername} onSelectMethod={setSelectedMethod} />
           </>
         ) : selectedMethod !== 'contacts' ? (
-          <SimpleRecoveryViews selectedMethod={selectedMethod} onBack={() => setSelectedMethod(null)} />
+          <SimpleRecoveryViews selectedMethod={selectedMethod} username={username} onBack={() => setSelectedMethod(null)} />
         ) : (
           <div className="space-y-5">
             <AuthBuddyGuidance guidanceKey="NO_ACCESS_TO_METHOD" />
@@ -58,17 +54,17 @@ export function RecoveryStart() {
                 <ShieldAlert className="w-6 h-6" />
               </div>
               <h1 className="text-2xl font-extrabold text-slate-900 high-contrast:text-white">
-                🛡 Secure Account Recovery
+                {t('recoveryTitle')}
               </h1>
               <p className="text-xs font-medium text-slate-600 max-w-sm mx-auto leading-relaxed high-contrast:text-slate-300">
-                We couldn't verify you using your usual methods. For your protection, we'll use your 3 trusted recovery contacts.
+                {t('recoverySubtitle')}
               </p>
             </div>
 
             <form onSubmit={handleStartRecoverySubmit} className="space-y-4">
               <div>
                 <label htmlFor="rec-username" className="block text-xs font-bold text-slate-800 mb-1 high-contrast:text-slate-100">
-                  Account Email to Recover
+                  {t('usernameLabel')}
                 </label>
                 <input
                   id="rec-username"
@@ -82,8 +78,8 @@ export function RecoveryStart() {
 
               <div className="space-y-2">
                 <h2 className="text-xs font-bold text-slate-900 high-contrast:text-amber-400 flex items-center justify-between">
-                  <span>Pre-Registered Trusted Contacts</span>
-                  <span className="text-[11px] font-semibold text-purple-700">Contact 1 Mandatory</span>
+                  <span>{t('verifyTrustedTitle')}</span>
+                  <span className="text-[11px] font-semibold text-purple-700">{t('mandatory')}</span>
                 </h2>
 
                 {contacts.map((c, index) => (
@@ -96,7 +92,7 @@ export function RecoveryStart() {
                   Back
                 </button>
                 <button type="submit" disabled={isLoading} className="flex-1 py-3 px-4 bg-purple-700 text-white font-bold text-sm rounded-xl hover:bg-purple-800 shadow flex items-center justify-center gap-1 transition-colors">
-                  {isLoading ? <span>Starting...</span> : <><span>Start Secure Recovery</span><ArrowRight className="w-4 h-4" /></>}
+                  {isLoading ? <span>Starting...</span> : <><span>{t('startRecovery')}</span><ArrowRight className="w-4 h-4" /></>}
                 </button>
               </div>
             </form>

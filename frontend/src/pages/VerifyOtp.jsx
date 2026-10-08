@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { verifyOtp, resendOtp } from '../api/mockApi';
 import { useAuth } from '../context/AuthContext';
+import { useA11yPrefs } from '../context/A11yContext';
 import { StepIndicator } from '../components/StepIndicator';
 import { ErrorBanner } from '../components/ErrorBanner';
 import { HelpPanel } from '../components/HelpPanel';
@@ -14,6 +15,7 @@ import { KeyRound, CheckCircle } from 'lucide-react';
 export function VerifyOtp() {
   const navigate = useNavigate();
   const { pendingOtpUser, completeLogin } = useAuth();
+  const { t } = useA11yPrefs();
   const username = pendingOtpUser || 'user@securebank.com';
 
   const { score, isGuidedMode, addStrugglePoints, resetScore, activeHelpMode, setActiveHelpMode } = useStruggleScore('VerifyOtp');
@@ -80,16 +82,15 @@ export function VerifyOtp() {
   return (
     <main id="main-content" className="min-h-[85vh] py-8 px-4 flex flex-col items-center justify-center">
       <div className="max-w-md w-full">
-        <StepIndicator currentStep={2} totalSteps={2} stepTitle="Security Code Verification" />
+        <StepIndicator currentStep={2} totalSteps={2} stepTitle={t('otpStepTitle')} />
 
-        {/* AuthBuddy Universal Contextual Guidance Component */}
         <AuthBuddyGuidance guidanceKey={guidanceKey} />
 
         <ErrorBanner 
           errorCode={errorCode} 
           onClose={() => setErrorCode(null)} 
           onPrimaryAction={isExpired ? handleResendCode : () => setCode('')}
-          primaryActionLabel={isExpired ? "Get New Code" : "Clear Code"}
+          primaryActionLabel={isExpired ? t('resendButton') : "Clear Code"}
         />
 
         {resendSuccess && (
@@ -103,8 +104,8 @@ export function VerifyOtp() {
           <GuidedAuthLayout
             stepNumber={2}
             totalSteps={2}
-            stepTitle="Verify this device"
-            guidanceText="This device hasn't been used to sign in before. For your security, enter the 6-digit code sent to your registered phone."
+            stepTitle={t('otpTitle')}
+            guidanceText={t('otpSubtitle')}
           >
             <OtpFormControls
               code={code} setCode={setCode}
@@ -120,10 +121,10 @@ export function VerifyOtp() {
               <KeyRound className="w-6 h-6" />
             </div>
 
-            <h1 className="text-2xl font-bold text-slate-900 high-contrast:text-white">Enter 6-Digit Code</h1>
+            <h1 className="text-2xl font-bold text-slate-900 high-contrast:text-white">{t('otpTitle')}</h1>
 
             <p className="text-sm text-slate-600 font-medium leading-relaxed high-contrast:text-slate-300">
-              Sent to registered device for <strong className="text-slate-900 high-contrast:text-amber-400">{username}</strong>.
+              {t('otpSubtitle')} <strong className="text-slate-900 high-contrast:text-amber-400">{username}</strong>.
             </p>
 
             <OtpFormControls
@@ -135,13 +136,13 @@ export function VerifyOtp() {
             />
 
             <div className="text-xs text-slate-500 bg-slate-50 p-2.5 rounded-xl border border-slate-200 high-contrast:bg-slate-800 high-contrast:border-slate-700 high-contrast:text-slate-300">
-              <strong>Demo Hint:</strong> Code is <code className="bg-slate-200 px-1 rounded font-mono font-bold high-contrast:bg-slate-700">123456</code>.
+              <strong>{t('demoCodeHint')}</strong> <code className="bg-slate-200 px-1 rounded font-mono font-bold high-contrast:bg-slate-700">123456</code>
             </div>
           </div>
         )}
       </div>
 
-      <HelpPanel score={score} onResetScore={resetScore} stepName="VerifyOtp" activeHelpMode={activeHelpMode} setActiveHelpMode={setActiveHelpMode} onAddPoints={addStrugglePoints} />
+      {isGuidedMode && <HelpPanel score={score} onResetScore={resetScore} stepName="VerifyOtp" activeHelpMode={activeHelpMode} setActiveHelpMode={setActiveHelpMode} onAddPoints={addStrugglePoints} />}
     </main>
   );
 }

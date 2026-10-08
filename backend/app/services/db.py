@@ -28,6 +28,8 @@ def init_db():
         password TEXT NOT NULL,
         name TEXT,
         email_verified INTEGER DEFAULT 0,
+        phone_number TEXT,
+        phone_verified INTEGER DEFAULT 0,
         accessibility_profile TEXT DEFAULT '{}',
         trusted_contacts_json TEXT DEFAULT '[]'
     )
@@ -37,6 +39,10 @@ def init_db():
     cols = [r['name'] for r in cursor.fetchall()]
     if 'trusted_contacts_json' not in cols:
         cursor.execute("ALTER TABLE users ADD COLUMN trusted_contacts_json TEXT DEFAULT '[]'")
+    if 'phone_number' not in cols:
+        cursor.execute("ALTER TABLE users ADD COLUMN phone_number TEXT")
+    if 'phone_verified' not in cols:
+        cursor.execute("ALTER TABLE users ADD COLUMN phone_verified INTEGER DEFAULT 0")
 
     # 2. Email OTPs Table
     cursor.execute("""
@@ -127,12 +133,16 @@ def db_get_user(username: str) -> Optional[Dict[str, Any]]:
     
     keys = row.keys()
     trusted_contacts = json.loads(row['trusted_contacts_json'] or '[]') if 'trusted_contacts_json' in keys else []
+    phone_number = row['phone_number'] if 'phone_number' in keys else None
+    phone_verified = bool(row['phone_verified']) if 'phone_verified' in keys else False
 
     return {
         'username': row['username'],
         'password': row['password'],
         'name': row['name'] or row['username'].split('@')[0],
         'emailVerified': bool(row['email_verified']),
+        'phoneNumber': phone_number,
+        'phoneVerified': phone_verified,
         'accessibilityProfile': json.loads(row['accessibility_profile'] or '{}'),
         'trustedContacts': trusted_contacts
     }
@@ -144,19 +154,23 @@ def db_save_user(username: str, data: Dict[str, Any]):
     password = data.get('password', 'Password123!')
     name = data.get('name', user_key.split('@')[0])
     email_verified = 1 if data.get('emailVerified', False) else 0
+    phone_number = data.get('phoneNumber', None)
+    phone_verified = 1 if data.get('phoneVerified', False) else 0
     acc_profile = json.dumps(data.get('accessibilityProfile', {}))
     trusted_contacts = json.dumps(data.get('trustedContacts', []))
 
     cursor.execute("""
-    INSERT INTO users (username, password, name, email_verified, accessibility_profile, trusted_contacts_json)
-    VALUES (?, ?, ?, ?, ?, ?)
+    INSERT INTO users (username, password, name, email_verified, phone_number, phone_verified, accessibility_profile, trusted_contacts_json)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(username) DO UPDATE SET
         password = excluded.password,
         name = excluded.name,
         email_verified = excluded.email_verified,
+        phone_number = excluded.phone_number,
+        phone_verified = excluded.phone_verified,
         accessibility_profile = excluded.accessibility_profile,
         trusted_contacts_json = excluded.trusted_contacts_json
-    """, (user_key, password, name, email_verified, acc_profile, trusted_contacts))
+    """, (user_key, password, name, email_verified, phone_number, phone_verified, acc_profile, trusted_contacts))
     conn.commit()
     conn.close()
 
@@ -170,11 +184,15 @@ def db_get_all_users() -> Dict[str, Dict[str, Any]]:
     for r in rows:
         keys = r.keys()
         trusted = json.loads(r['trusted_contacts_json'] or '[]') if 'trusted_contacts_json' in keys else []
+        phone_number = r['phone_number'] if 'phone_number' in keys else None
+        phone_verified = bool(r['phone_verified']) if 'phone_verified' in keys else False
         result[r['username']] = {
             'username': r['username'],
             'password': r['password'],
             'name': r['name'] or r['username'].split('@')[0],
             'emailVerified': bool(r['email_verified']),
+            'phoneNumber': phone_number,
+            'phoneVerified': phone_verified,
             'accessibilityProfile': json.loads(r['accessibility_profile'] or '{}'),
             'trustedContacts': trusted
         }

@@ -1,14 +1,17 @@
 import React from 'react';
 import { useA11yPrefs } from '../context/A11yContext';
-import { Type, Eye, Volume2, RotateCcw } from 'lucide-react';
+import { Type, Eye, Volume2, Globe, RotateCcw } from 'lucide-react';
 
 export function AccessibilityBar() {
   const {
     prefs,
+    languages,
+    setLanguage,
     setTextSize,
     toggleHighContrast,
     toggleVoiceGuidance,
-    resetA11yPrefs
+    resetA11yPrefs,
+    t
   } = useA11yPrefs();
 
   const textSizes = [
@@ -25,28 +28,41 @@ export function AccessibilityBar() {
       aria-label="Accessibility Settings Bar"
     >
       <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3">
-        {/* Skip to Content Link for keyboard accessibility */}
         <a 
           href="#main-content" 
           className="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:p-3 focus:bg-amber-400 focus:text-slate-950 focus:font-bold focus:rounded-md focus:shadow-lg focus:outline-none"
         >
-          Skip to main content
+          {t('skipToContent')}
         </a>
 
         <div className="flex items-center space-x-2 font-medium">
           <span className="text-amber-400 font-semibold flex items-center gap-1.5 text-xs uppercase tracking-wider">
             <Type className="w-4 h-4" aria-hidden="true" />
-            Accessibility Bar
+            {t('a11yBarTitle')}
           </span>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
+          {/* Language Selector Dropdown */}
+          <div className="flex items-center gap-1.5 bg-slate-800 rounded-lg px-2 py-1 border border-slate-700">
+            <Globe className="w-4 h-4 text-amber-400" aria-hidden="true" />
+            <label htmlFor="language-select" className="sr-only">{t('language')}</label>
+            <select
+              id="language-select"
+              value={prefs.language || 'en'}
+              onChange={(e) => setLanguage(e.target.value)}
+              className="bg-transparent text-slate-100 font-bold text-xs focus:outline-none focus:ring-2 focus:ring-amber-400 rounded cursor-pointer"
+            >
+              {languages.map((lang) => (
+                <option key={lang.code} value={lang.code} className="bg-slate-900 text-white font-medium">
+                  {lang.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
           {/* Text Size Control */}
-          <div 
-            className="flex items-center bg-slate-800 rounded-lg p-0.5 border border-slate-700" 
-            role="group" 
-            aria-label="Adjust Text Size"
-          >
+          <div className="flex items-center bg-slate-800 rounded-lg p-0.5 border border-slate-700" role="group" aria-label="Adjust Text Size">
             {textSizes.map((size) => (
               <button
                 key={size.key}
@@ -76,10 +92,9 @@ export function AccessibilityBar() {
                 : 'bg-slate-800 text-slate-200 border-slate-700 hover:bg-slate-700'
             }`}
             aria-pressed={prefs.highContrast}
-            aria-label="Toggle High Contrast Mode"
           >
             <Eye className="w-4 h-4" aria-hidden="true" />
-            <span>High Contrast {prefs.highContrast ? '(On)' : ''}</span>
+            <span>{t('highContrast')} {prefs.highContrast ? '(On)' : ''}</span>
           </button>
 
           {/* Voice Guidance Toggle */}
@@ -92,10 +107,9 @@ export function AccessibilityBar() {
                 : 'bg-slate-800 text-slate-200 border-slate-700 hover:bg-slate-700'
             }`}
             aria-pressed={prefs.voiceGuidance}
-            aria-label="Toggle Voice Guidance Read Aloud"
           >
             <Volume2 className="w-4 h-4" aria-hidden="true" />
-            <span>Voice Guidance {prefs.voiceGuidance ? '(On)' : ''}</span>
+            <span>{t('voiceGuidance')} {prefs.voiceGuidance ? '(On)' : ''}</span>
           </button>
 
           {/* Reset Button */}
@@ -103,11 +117,9 @@ export function AccessibilityBar() {
             type="button"
             onClick={resetA11yPrefs}
             className="min-h-[44px] min-w-[44px] px-2 py-1.5 text-xs font-medium rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors flex items-center gap-1"
-            aria-label="Reset accessibility preferences to default"
             title="Reset to default settings"
           >
-            <RotateCcw className="w-3.5 h-3.5" aria-hidden="true" />
-            <span className="hidden sm:inline">Reset</span>
+            <RotateCcw className="w-4 h-4" />
           </button>
         </div>
       </div>

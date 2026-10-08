@@ -1,53 +1,95 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
+
+const BACKEND_URL = 'http://localhost:5000';
 
 export function useSpeech() {
   const [isSpeaking, setIsSpeaking] = useState(false);
-  const [isSupported, setIsSupported] = useState(false);
+  const [isSupported] = useState(true);
+  const voicesRef = useRef([]);
+  const audioRef = useRef(null);
 
-  useEffect(() => {
+  const loadVoices = useCallback(() => {
     if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
-      setIsSupported(true);
+      const availableVoices = window.speechSynthesis.getVoices();
+      if (availableVoices && availableVoices.length > 0) {
+        voicesRef.current = availableVoices;
+      }
     }
   }, []);
 
-  const stop = useCallback(() => {
-    if (isSupported && window.speechSynthesis) {
-      window.speechSynthesis.cancel();
-      setIsSpeaking(false);
+  useEffect(() => {
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      loadVoices();
+      if (window.speechSynthesis.onvoiceschanged !== undefined) {
+        window.speechSynthesis.onvoiceschanged = loadVoices;
+      }
     }
-  }, [isSupported]);
+  }, [loadVoices]);
 
-  const speak = useCallback((text) => {
-    if (!isSupported || !text) return;
+  const stop = useCallback(() => {
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current = null;
+    }
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+    }
+    setIsSpeaking(false);
+  }, []);
 
-    // Stop any ongoing speech
-    window.speechSynthesis.cancel();
+  const speak = useCallback((text, langCode = 'en-IN') => {
+    if (!text) return;
+    stop();
 
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.rate = 0.9; // Slightly slower for clarity
-    utterance.pitch = 1.0;
+    if (voicesRef.current.length === 0 && window.speechSynthesis?.getVoices) {
+      voicesRef.current = window.speechSynthesis.getVoices();
+    }
 
-    utterance.onstart = () => setIsSpeaking(true);
-    utterance.onend = () => setIsSpeaking(false);
-    utterance.onerror = (e) => {
-      console.warn('Speech synthesis error:', e);
-      setIsSpeaking(false);
-    };
+    const targetLang = (langCode || 'en-IN').toLowerCase();
+    const shortLang = targetLang.split('-')[0];
+    const available = voicesRef.current;
 
-    window.speechSynthesis.speak(utterance);
-  }, [isSupported]);
+    let selectedVoice = available.find(v => v.lang.toLowerCase() === targetLang);
+    if (!selectedVoice) {
+      selectedVoice = available.find(v => v.lang.toLowerCase().startsWith(shortLang));
+    }
+    if (!selectedVoice) {
+      const nameMap = { hi: 'hindi', ta: 'tamil', ml: 'malayalam', en: 'english' };
+      const searchName = nameMap[shortLang];
+      if (searchName) {
+        selectedVoice = available.find(v => v.name.toLowerCase().includes(searchName));
+      }
+    }
 
-  // Clean up on unmount
+    if (selectedVoice) {
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.voice = selectedVoice;
+      utterance.lang = selectedVoice.lang;
+      utterance.rate = 0.9;
+      utterance.pitch = 1.0;
+      utterance.onstart = () => setIsSpeaking(true);
+      utterance.onend = () => setIsSpeaking(false);
+      utterance.onerror = () => setIsSpeaking(false);
+      window.speechSynthesis.speak(utterance);
+    } else {
+      const audioUrl = `${BACKEND_URL}/api/v1/tts?text=${encodeURIComponent(text)}&lang=${shortLang}`;
+      const audio = new Audio(audioUrl);
+      audioRef.current = audio;
+      audio.onplay = () => setIsSpeaking(true);
+      audio.onended = () => setIsSpeaking(false);
+      audio.onerror = () => setIsSpeaking(false);
+      audio.play().catch(e => {
+        console.warn('Audio TTS playback failed:', e);
+        setIsSpeaking(false);
+      });
+    }
+  }, [stop]);
+
   useEffect(() => {
     return () => {
       stop();
     };
   }, [stop]);
 
-  return {
-    speak,
-    stop,
-    isSpeaking,
-    isSupported,
-  };
+  return { speak, stop, isSpeaking, isSupported };
 }

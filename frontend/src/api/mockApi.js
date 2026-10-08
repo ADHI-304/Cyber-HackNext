@@ -38,11 +38,43 @@ async function apiFetch(endpoint, options = {}) {
   }
 }
 
-export async function register(username, password, accessibilityProfile = {}, trustedContacts = []) {
+export async function sendRegistrationPhoneOtp(phone) {
+  if (USE_REAL_BACKEND) {
+    const res = await apiFetch('/api/v1/auth/send-phone-otp', {
+      method: 'POST',
+      body: JSON.stringify({ phone })
+    });
+    if (res) return res;
+  }
+  await delay(300);
+  return { ok: true, success: true, message: `6-digit verification code sent to ${phone}`, demoCodeHint: '123456' };
+}
+
+export async function verifyRegistrationPhone(username, phone, otp) {
+  if (USE_REAL_BACKEND) {
+    const res = await apiFetch('/api/v1/auth/verify-phone-registration', {
+      method: 'POST',
+      body: JSON.stringify({ username, phone, otp })
+    });
+    if (res) return res;
+  }
+  await delay(350);
+  if (otp === '123456' || otp.length === 6) {
+    const usr = mockUsers.get(username);
+    if (usr) {
+      usr.phoneNumber = phone;
+      usr.phoneVerified = true;
+    }
+    return { ok: true, success: true, message: 'Phone number verified ✓', phoneVerified: true };
+  }
+  return { ok: false, success: false, errorCode: 'OTP_INVALID', message: 'The phone verification code is incorrect.' };
+}
+
+export async function register(username, password, phone = '', accessibilityProfile = {}, trustedContacts = []) {
   if (USE_REAL_BACKEND) {
     const res = await apiFetch('/api/v1/auth/register', {
       method: 'POST',
-      body: JSON.stringify({ username, password, accessibilityProfile, trustedContacts })
+      body: JSON.stringify({ username, password, phone, accessibilityProfile, trustedContacts })
     });
     if (res) return res;
   }
@@ -57,13 +89,15 @@ export async function register(username, password, accessibilityProfile = {}, tr
     return { ok: false, errorCode: 'WEAK_PASSWORD', data: null };
   }
 
-  mockUsers.set(username, { username, password, accessibilityProfile, trustedContacts });
+  mockUsers.set(username, { username, password, phoneNumber: phone, phoneVerified: false, accessibilityProfile, trustedContacts });
 
   return {
     ok: true,
     errorCode: null,
     data: {
       username,
+      phoneNumber: phone,
+      phoneVerified: false,
       trustedContacts,
       qrPlaceholderUrl: `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=otpauth://totp/SecureBank:${encodeURIComponent(username)}?secret=JBSWY3DPEHPK3PXP&issuer=SecureBank`,
       secretKey: 'JBSWY3DPEHPK3PXP',

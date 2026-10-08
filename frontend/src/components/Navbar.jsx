@@ -1,10 +1,12 @@
 import React from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { Shield, KeyRound, LogOut, BarChart3, HelpCircle, UserPlus, LogIn } from 'lucide-react';
+import { useA11yPrefs } from '../context/A11yContext';
+import { Shield, LogOut, BarChart3, HelpCircle, UserPlus, LogIn } from 'lucide-react';
 
 export function Navbar() {
   const { user, logout } = useAuth();
+  const { t } = useA11yPrefs();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -19,49 +21,42 @@ export function Navbar() {
     <header className="bg-white border-b border-slate-200 shadow-sm">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
-          {/* Logo & Brand */}
           <Link 
             to="/" 
             className="flex items-center gap-2.5 font-bold text-slate-900 text-lg sm:text-xl rounded-lg focus-visible:ring-4 focus-visible:ring-amber-500 focus-visible:outline-none p-1"
-            aria-label="AuthBuddy Homepage - SecureBank Demo"
           >
             <div className="bg-sky-600 text-white p-2 rounded-xl flex items-center justify-center shadow-md">
               <Shield className="w-5 h-5" aria-hidden="true" />
             </div>
             <div className="flex flex-col">
-              <span className="leading-tight text-slate-900 font-bold">AuthBuddy</span>
-              <span className="text-[10px] uppercase font-bold tracking-widest text-sky-700">SecureBank Demo</span>
+              <span className="leading-tight text-slate-900 font-bold">{t('appName')}</span>
+              <span className="text-[10px] uppercase font-bold tracking-widest text-sky-700">{t('demoBadge')}</span>
             </div>
           </Link>
 
-          {/* Navigation Links */}
           <nav aria-label="Main Navigation">
-            <ul className="flex items-center space-x-1 sm:space-x-3">
+            <ul className="flex items-center space-x-1 sm:space-x-2">
               {user ? (
                 <>
                   <li>
                     <Link
                       to="/dashboard"
                       className={`min-h-[44px] px-3 py-2 text-sm font-medium rounded-lg flex items-center gap-1.5 transition-colors ${
-                        isActive('/dashboard') 
-                          ? 'bg-sky-50 text-sky-800 font-semibold' 
-                          : 'text-slate-700 hover:text-slate-900 hover:bg-slate-100'
+                        isActive('/dashboard') ? 'bg-sky-50 text-sky-800 font-semibold' : 'text-slate-700 hover:text-slate-900 hover:bg-slate-100'
                       }`}
                     >
-                      Dashboard
+                      {t('navDashboard')}
                     </Link>
                   </li>
                   <li>
                     <Link
                       to="/admin-friction"
                       className={`min-h-[44px] px-3 py-2 text-sm font-medium rounded-lg flex items-center gap-1.5 transition-colors ${
-                        isActive('/admin-friction') 
-                          ? 'bg-amber-100 text-amber-900 font-semibold' 
-                          : 'text-slate-700 hover:text-slate-900 hover:bg-slate-100'
+                        isActive('/admin-friction') ? 'bg-amber-100 text-amber-900 font-semibold' : 'text-slate-700 hover:text-slate-900 hover:bg-slate-100'
                       }`}
                     >
                       <BarChart3 className="w-4 h-4 text-amber-700" aria-hidden="true" />
-                      <span>Admin Metrics</span>
+                      <span>{t('navAdmin')}</span>
                     </Link>
                   </li>
                   <li>
@@ -69,10 +64,9 @@ export function Navbar() {
                       type="button"
                       onClick={handleLogout}
                       className="min-h-[44px] px-3 py-2 text-sm font-medium rounded-lg text-rose-700 hover:bg-rose-50 flex items-center gap-1.5 transition-colors"
-                      aria-label="Log out of SecureBank"
                     >
                       <LogOut className="w-4 h-4" aria-hidden="true" />
-                      <span>Logout ({user.username})</span>
+                      <span>{t('navLogout')}</span>
                     </button>
                   </li>
                 </>
@@ -81,27 +75,23 @@ export function Navbar() {
                   <li>
                     <Link
                       to="/login"
-                      className={`min-h-[44px] px-3.5 py-2 text-sm font-medium rounded-lg flex items-center gap-1.5 transition-colors ${
-                        isActive('/login') || isActive('/')
-                          ? 'bg-sky-100 text-sky-900 font-semibold' 
-                          : 'text-slate-700 hover:text-slate-900 hover:bg-slate-100'
+                      className={`min-h-[44px] px-3 py-2 text-sm font-medium rounded-lg flex items-center gap-1.5 transition-colors ${
+                        isActive('/login') || isActive('/') ? 'bg-sky-100 text-sky-900 font-semibold' : 'text-slate-700 hover:text-slate-900 hover:bg-slate-100'
                       }`}
                     >
                       <LogIn className="w-4 h-4" aria-hidden="true" />
-                      <span>Sign In</span>
+                      <span>{t('navLogin')}</span>
                     </Link>
                   </li>
                   <li>
                     <Link
                       to="/register"
-                      className={`min-h-[44px] px-3.5 py-2 text-sm font-medium rounded-lg flex items-center gap-1.5 transition-colors ${
-                        isActive('/register') 
-                          ? 'bg-sky-600 text-white font-semibold shadow-sm' 
-                          : 'bg-sky-700 text-white hover:bg-sky-800 shadow-sm'
+                      className={`min-h-[44px] px-3 py-2 text-sm font-medium rounded-lg flex items-center gap-1.5 transition-colors ${
+                        isActive('/register') ? 'bg-sky-600 text-white font-semibold shadow-sm' : 'bg-sky-700 text-white hover:bg-sky-800 shadow-sm'
                       }`}
                     >
                       <UserPlus className="w-4 h-4" aria-hidden="true" />
-                      <span>Register</span>
+                      <span>{t('navRegister')}</span>
                     </Link>
                   </li>
                   <li>
@@ -112,7 +102,7 @@ export function Navbar() {
                       }`}
                     >
                       <Shield className="w-4 h-4 text-purple-700" aria-hidden="true" />
-                      <span>Accept Trusted Contact</span>
+                      <span>{t('navAcceptContact')}</span>
                     </Link>
                   </li>
                   <li>
@@ -121,20 +111,18 @@ export function Navbar() {
                       className={`min-h-[44px] px-3 py-2 text-sm font-medium rounded-lg text-slate-700 hover:bg-slate-100 flex items-center gap-1.5 transition-colors ${
                         isActive('/recovery-start') ? 'bg-slate-100 text-slate-900 font-semibold' : ''
                       }`}
-                      aria-label="Account Recovery"
                     >
                       <HelpCircle className="w-4 h-4 text-slate-500" aria-hidden="true" />
-                      <span className="hidden md:inline">Account Recovery</span>
+                      <span>{t('navRecovery')}</span>
                     </Link>
                   </li>
                   <li>
                     <Link
                       to="/admin-friction"
-                      className="min-h-[44px] px-3 py-2 text-xs font-semibold rounded-lg bg-amber-100 text-amber-900 hover:bg-amber-200 flex items-center gap-1 transition-colors ml-1"
-                      aria-label="Open Admin Friction Dashboard"
+                      className="min-h-[44px] px-2.5 py-2 text-xs font-semibold rounded-lg bg-amber-100 text-amber-900 hover:bg-amber-200 flex items-center gap-1 transition-colors ml-0.5"
                     >
                       <BarChart3 className="w-3.5 h-3.5 text-amber-700" aria-hidden="true" />
-                      <span>Admin</span>
+                      <span>{t('navAdmin')}</span>
                     </Link>
                   </li>
                 </>
