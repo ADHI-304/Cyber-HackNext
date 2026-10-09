@@ -1,6 +1,6 @@
 import React from 'react';
 
-export function AuthForm({ title, subtitle, onSubmit, children, submitText, isLoading, icon: Icon }) {
+export function AuthForm({ title, subtitle, onSubmit, children, submitText, isLoading, icon: Icon, errorBanner }) {
   return (
     <div className="bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 shadow-xl max-w-md w-full mx-auto high-contrast:bg-slate-900 high-contrast:border-amber-400">
       <div className="text-center mb-6">
@@ -41,6 +41,8 @@ export function AuthForm({ title, subtitle, onSubmit, children, submitText, isLo
             )}
           </button>
         )}
+
+        {errorBanner}
       </form>
     </div>
   );

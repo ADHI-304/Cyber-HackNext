@@ -124,10 +124,14 @@ async def get_friction_statistics(admin_user: dict = Depends(get_admin_user)):
     cursor.execute("SELECT COUNT(*) FROM recovery_sessions")
     total_sessions = cursor.fetchone()[0]
 
+    succ_val = max(1, completed_sessions, recovered)
+    tot_val = max(succ_val, total_sessions, forgot_password)
+    time_val = max(0, tot_val - succ_val)
+
     recovery_stats = {
-        "totalRequests": max(total_sessions, forgot_password),
-        "successful": max(completed_sessions, recovered),
-        "timedOut": max(0, total_sessions - completed_sessions),
+        "totalRequests": tot_val,
+        "successful": succ_val,
+        "timedOut": time_val,
         "denied": 0
     }
 

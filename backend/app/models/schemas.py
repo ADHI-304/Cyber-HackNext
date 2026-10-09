@@ -113,3 +113,18 @@ class VerifyTotpRecoveryRequest(BaseModel):
     username: Optional[str] = 'user@securebank.com'
     code: str
 
+class ChangePasswordRequest(BaseModel):
+    username: str
+    currentPassword: str
+    newPassword: str
+
+class UpdateTrustedContactsRequest(BaseModel):
+    username: str
+    trustedContacts: List[TrustedContactModel]
+
+class VerifyRegistrationTrustedContactRequest(BaseModel):
+    username: str
+    contactEmail: str
+    otp: str
+
+

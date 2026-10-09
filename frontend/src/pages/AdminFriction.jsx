@@ -25,12 +25,32 @@ export function AdminFriction() {
     fetchStats();
   }, []);
 
-  if (isLoading || !stats) {
+  if (isLoading) {
     return (
       <main id="main-content" className="min-h-[80vh] flex items-center justify-center p-6">
         <div className="flex items-center gap-3 text-sky-700 font-bold">
           <RefreshCw className="w-6 h-6 animate-spin" />
           <span>Loading Admin Friction Telemetry...</span>
+        </div>
+      </main>
+    );
+  }
+
+  if (!stats) {
+    return (
+      <main id="main-content" className="min-h-[80vh] flex flex-col items-center justify-center p-6">
+        <div className="bg-rose-50 border border-rose-200 text-rose-800 rounded-2xl p-6 text-center max-w-md shadow-md">
+          <h2 className="font-bold text-lg mb-2">Access Denied / Telemetry Error</h2>
+          <p className="text-xs text-rose-700 mb-4 leading-relaxed">
+            Unable to fetch admin telemetry metrics. Please ensure you are logged in with administrator privileges.
+          </p>
+          <button
+            type="button"
+            onClick={fetchStats}
+            className="px-4 py-2 bg-rose-600 text-white font-bold text-xs rounded-xl hover:bg-rose-700 transition"
+          >
+            Retry Loading
+          </button>
         </div>
       </main>
     );

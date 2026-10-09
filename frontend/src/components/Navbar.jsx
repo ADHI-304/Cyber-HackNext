@@ -22,7 +22,7 @@ export function Navbar() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           <Link 
-            to="/" 
+            to={user?.role === 'admin' ? '/admin-friction' : '/'} 
             className="flex items-center gap-2.5 font-bold text-slate-900 text-lg sm:text-xl rounded-lg focus-visible:ring-4 focus-visible:ring-amber-500 focus-visible:outline-none p-1"
           >
             <div className="bg-sky-600 text-white p-2 rounded-xl flex items-center justify-center shadow-md">
@@ -38,17 +38,7 @@ export function Navbar() {
             <ul className="flex items-center space-x-1 sm:space-x-2">
               {user ? (
                 <>
-                  <li>
-                    <Link
-                      to="/dashboard"
-                      className={`min-h-[44px] px-3 py-2 text-sm font-medium rounded-lg flex items-center gap-1.5 transition-colors ${
-                        isActive('/dashboard') ? 'bg-sky-50 text-sky-800 font-semibold' : 'text-slate-700 hover:text-slate-900 hover:bg-slate-100'
-                      }`}
-                    >
-                      {t('navDashboard')}
-                    </Link>
-                  </li>
-                  {user.role === 'admin' && (
+                  {user.role === 'admin' ? (
                     <li>
                       <Link
                         to="/admin-friction"
@@ -58,6 +48,17 @@ export function Navbar() {
                       >
                         <BarChart3 className="w-4 h-4 text-amber-700" aria-hidden="true" />
                         <span>{t('navAdmin')}</span>
+                      </Link>
+                    </li>
+                  ) : (
+                    <li>
+                      <Link
+                        to="/dashboard"
+                        className={`min-h-[44px] px-3 py-2 text-sm font-medium rounded-lg flex items-center gap-1.5 transition-colors ${
+                          isActive('/dashboard') ? 'bg-sky-50 text-sky-800 font-semibold' : 'text-slate-700 hover:text-slate-900 hover:bg-slate-100'
+                        }`}
+                      >
+                        {t('navDashboard')}
                       </Link>
                     </li>
                   )}

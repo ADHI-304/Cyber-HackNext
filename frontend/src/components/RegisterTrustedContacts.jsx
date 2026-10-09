@@ -23,11 +23,11 @@ export function RegisterTrustedContacts({ contacts, setContacts }) {
           <div key={idx} className="bg-white p-2.5 rounded-lg border border-purple-100 space-y-1.5 high-contrast:bg-slate-900 high-contrast:border-slate-700">
             <div className="flex items-center justify-between text-xs">
               <span className="font-bold text-slate-800 flex items-center gap-1 high-contrast:text-amber-400">
-                {idx === 0 ? 'Contact 1 (Mandatory Primary)' : `Contact ${idx + 1} (Optional)`}
+                {idx === 0 ? <>Contact 1 (Mandatory Primary) <span className="text-rose-500 font-bold ml-0.5">*</span></> : `Contact ${idx + 1} (Optional)`}
               </span>
               {idx === 0 && (
                 <span className="bg-amber-100 text-amber-900 text-[10px] font-extrabold px-1.5 py-0.5 rounded flex items-center gap-0.5">
-                  <ShieldCheck className="w-3 h-3 text-amber-700" /> Required
+                  <ShieldCheck className="w-3 h-3 text-amber-700" /> Required *
                 </span>
               )}
             </div>
@@ -36,7 +36,7 @@ export function RegisterTrustedContacts({ contacts, setContacts }) {
               <input
                 type="text"
                 required={idx === 0}
-                placeholder={idx === 0 ? "Full Name (Required)" : `Friend ${idx + 1} Name`}
+                placeholder={idx === 0 ? "Full Name (Required *)" : `Friend ${idx + 1} Name`}
                 value={c.name}
                 onChange={(e) => handleChange(idx, 'name', e.target.value)}
                 className="w-full px-2.5 py-1.5 rounded-md border border-slate-300 bg-slate-50 text-slate-900 focus:bg-white focus:ring-2 focus:ring-purple-400 high-contrast:bg-slate-800 high-contrast:text-white"
@@ -44,7 +44,7 @@ export function RegisterTrustedContacts({ contacts, setContacts }) {
               <input
                 type="email"
                 required={idx === 0}
-                placeholder={idx === 0 ? "Primary Email (Required)" : `friend${idx + 1}@example.com`}
+                placeholder={idx === 0 ? "Primary Email (Required *)" : `friend${idx + 1}@example.com`}
                 value={c.email}
                 onChange={(e) => handleChange(idx, 'email', e.target.value)}
                 className="w-full px-2.5 py-1.5 rounded-md border border-slate-300 bg-slate-50 text-slate-900 focus:bg-white focus:ring-2 focus:ring-purple-400 high-contrast:bg-slate-800 high-contrast:text-white"

@@ -29,6 +29,19 @@ export function AuthProvider({ children }) {
     }
   };
 
+  const updateUser = (updatedFields) => {
+    setUser((prev) => {
+      const updated = { ...(prev || {}), ...updatedFields };
+      try {
+        sessionStorage.setItem('authbuddy_user', JSON.stringify(updated));
+        localStorage.setItem('authbuddy_user', JSON.stringify(updated));
+      } catch (e) {
+        console.warn('Could not save updated user session', e);
+      }
+      return updated;
+    });
+  };
+
   const logout = () => {
     setUser(null);
     setPendingOtpUser(null);
@@ -47,6 +60,7 @@ export function AuthProvider({ children }) {
         pendingOtpUser,
         startOtpStep,
         completeLogin,
+        updateUser,
         logout,
         isAuthenticated: !!user,
       }}

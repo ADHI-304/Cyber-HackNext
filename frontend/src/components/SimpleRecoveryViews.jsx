@@ -15,8 +15,6 @@ export function SimpleRecoveryViews({ selectedMethod, username, onBack }) {
   const [isVerifying, setIsVerifying] = useState(false);
   const [errorMsg, setErrorMsg] = useState(null);
 
-  const [demoHint, setDemoHint] = useState(null);
-
   const targetUser = username || 'user@securebank.com';
 
   useEffect(() => {
@@ -26,9 +24,6 @@ export function SimpleRecoveryViews({ selectedMethod, username, onBack }) {
         const res = await requestPhoneRecoveryOtp(targetUser);
         if (res.data?.maskedPhone) {
           setMaskedPhone(res.data.maskedPhone);
-        }
-        if (res.data?.demoCodeHint) {
-          setDemoHint(res.data.demoCodeHint);
         }
         if (res.ok === false || res.data?.success === false) {
           setErrorMsg(res.data?.message || res.message || 'No verified phone number registered for this account.');
@@ -90,9 +85,6 @@ export function SimpleRecoveryViews({ selectedMethod, username, onBack }) {
 
         <div className="space-y-2">
           <OtpInput length={6} value={code} onChange={setCode} onComplete={(val) => handleVerifyPhone(val)} />
-          <button type="button" onClick={() => setCode(demoHint || '123456')} className="text-[11px] font-bold text-sky-700 bg-sky-50 border border-sky-200 px-3 py-1.5 rounded-lg hover:bg-sky-100 transition-colors">
-            {t('autoFillDemoCode')} {demoHint ? `(${demoHint})` : ''}
-          </button>
         </div>
 
         {errorMsg && <div className="text-xs font-bold text-rose-600 p-2 bg-rose-50 border border-rose-200 rounded-xl">{errorMsg}</div>}
@@ -147,9 +139,6 @@ export function SimpleRecoveryViews({ selectedMethod, username, onBack }) {
 
         <div className="space-y-2">
           <OtpInput length={6} value={code} onChange={setCode} onComplete={(val) => handleVerifyTotp(val)} />
-          <button type="button" onClick={() => setCode('123456')} className="text-[11px] font-bold text-amber-800 bg-amber-50 border border-amber-200 px-3 py-1.5 rounded-lg hover:bg-amber-100 transition-colors">
-            {t('autoFillDemoCode')}
-          </button>
         </div>
 
         {errorMsg && <div className="text-xs font-bold text-rose-600">{errorMsg}</div>}

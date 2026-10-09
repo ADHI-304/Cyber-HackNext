@@ -104,7 +104,7 @@ export function VerifyOtp() {
         {resendSuccess && (
           <div className="mb-4 bg-emerald-50 border border-emerald-300 text-emerald-900 rounded-xl p-3 text-xs font-bold flex items-center gap-2" role="status">
             <CheckCircle className="w-4 h-4 text-emerald-600" />
-            <span>A fresh 6-digit code was sent to your device! Demo code: 123456</span>
+            <span>A fresh 6-digit code was sent to your device!</span>
           </div>
         )}
 
@@ -142,10 +142,6 @@ export function VerifyOtp() {
               timerSeconds={timerSeconds} handleResendCode={handleResendCode}
               addStrugglePoints={addStrugglePoints}
             />
-
-            <div className="text-xs text-slate-500 bg-slate-50 p-2.5 rounded-xl border border-slate-200 high-contrast:bg-slate-800 high-contrast:border-slate-700 high-contrast:text-slate-300">
-              <strong>{t('demoCodeHint')}</strong> <code className="bg-slate-200 px-1 rounded font-mono font-bold high-contrast:bg-slate-700">123456</code>
-            </div>
           </div>
         )}
       </div>

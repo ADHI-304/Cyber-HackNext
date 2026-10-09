@@ -74,7 +74,9 @@ export function ContactApproval() {
                 {t('acceptContactSubtitle')}
               </p>
               <div>
-                <label className="block text-xs font-bold text-slate-800 mb-1">{t('contactEmailLabel')}</label>
+                <label className="block text-xs font-bold text-slate-800 mb-1">
+                  {t('contactEmailLabel')} <span className="text-rose-500 font-bold ml-0.5">*</span>
+                </label>
                 <div className="relative">
                   <input type="email" required value={contactEmail} onChange={(e) => setContactEmail(e.target.value)} placeholder="you@example.com" className="w-full min-h-[44px] px-3 pl-9 rounded-xl border border-slate-300 text-xs font-semibold focus:ring-2 focus:ring-purple-500" />
                   <Mail className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
@@ -82,7 +84,9 @@ export function ContactApproval() {
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-800 mb-1">{t('invitationCodeLabel')}</label>
+                <label className="block text-xs font-bold text-slate-800 mb-1">
+                  {t('invitationCodeLabel')} <span className="text-rose-500 font-bold ml-0.5">*</span>
+                </label>
                 <div className="relative">
                   <input type="text" required value={invitationCode} onChange={(e) => setInvitationCode(e.target.value)} placeholder={t('invitationCodePlaceholder')} className="w-full min-h-[44px] px-3 pl-9 rounded-xl border border-slate-300 text-xs font-bold tracking-wider uppercase focus:ring-2 focus:ring-purple-500" />
                   <KeyRound className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
@@ -99,7 +103,9 @@ export function ContactApproval() {
                 {t('enterEmailOtpSubtitle')} (<strong>{contactEmail}</strong>)
               </div>
               <div>
-                <label className="block text-xs font-bold text-slate-800 mb-1">{t('enter6DigitCode')}</label>
+                <label className="block text-xs font-bold text-slate-800 mb-1">
+                  {t('enter6DigitCode')} <span className="text-rose-500 font-bold ml-0.5">*</span>
+                </label>
                 <input type="text" maxLength={6} required value={otp} onChange={(e) => setOtp(e.target.value)} placeholder="123456" className="w-full min-h-[44px] px-3 rounded-xl border border-slate-300 text-center text-lg font-mono font-bold tracking-widest focus:ring-2 focus:ring-purple-500" />
               </div>
 

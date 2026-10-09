@@ -93,16 +93,20 @@ async def request_phone_recovery_otp(body: PhoneRecoveryRequest):
     raw_otp = f"{secrets.randbelow(1000000):06d}"
     active_otps[username] = {"code": raw_otp, "expiresAt": time.time() + 300}
 
-    print(f"\n=======================================================")
-    print(f"[RECOVERY PHONE OTP DISPATCH] User: {username} | Phone: {registered_phone} ({masked_phone}) | Code: {raw_otp}")
-    print(f"=======================================================\n")
+    if DEMO_MODE:
+        print(f"\n=======================================================")
+        print(f"[RECOVERY PHONE OTP DISPATCH] User: {username} | Phone: {registered_phone} ({masked_phone}) | Code: {raw_otp}")
+        print(f"=======================================================\n")
+    else:
+        print(f"\n=======================================================")
+        print(f"[RECOVERY PHONE OTP DISPATCH] User: {username} | Phone: {registered_phone} ({masked_phone})")
+        print(f"=======================================================\n")
 
     log_telemetry_event("PHONE_RECOVERY_OTP_SENT", step="Recovery", metadata={"username": username, "maskedPhone": masked_phone})
     
     res_data = {
         "message": f"6-digit verification code sent to registered phone {masked_phone}",
-        "maskedPhone": masked_phone,
-        "demoCodeHint": raw_otp
+        "maskedPhone": masked_phone
     }
 
     return ApiResponse(ok=True, errorCode=None, data=res_data)

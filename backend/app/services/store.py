@@ -9,6 +9,7 @@ import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
+from app.config import DEMO_MODE
 from app.services.db import (
     db_get_user, db_save_user, db_get_all_users,
     db_get_email_otp, db_save_email_otp, db_delete_email_otp,
@@ -241,9 +242,14 @@ def generate_and_send_email_otp(email: str, purpose: str = "EMAIL_VERIFICATION",
         "used": False
     }
 
-    print(f"\n=======================================================")
-    print(f"[OTP DISPATCH] To: {email_key} | Purpose: {purpose_key} | Code: {raw_otp}")
-    print(f"=======================================================\n")
+    if DEMO_MODE:
+        print(f"\n=======================================================")
+        print(f"[OTP DISPATCH] To: {email_key} | Purpose: {purpose_key} | Code: {raw_otp}")
+        print(f"=======================================================\n")
+    else:
+        print(f"\n=======================================================")
+        print(f"[OTP DISPATCH] To: {email_key} | Purpose: {purpose_key}")
+        print(f"=======================================================\n")
 
     sent = send_system_email_otp(email_key, raw_otp, purpose=purpose_key)
     return sent, "OK"

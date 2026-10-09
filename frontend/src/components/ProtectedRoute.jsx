@@ -13,6 +13,10 @@ export function ProtectedRoute({ children, requireAdmin = false }) {
     return <Navigate to="/dashboard" replace />;
   }
 
+  if (!requireAdmin && user?.role === 'admin') {
+    return <Navigate to="/admin-friction" replace />;
+  }
+
   return children;
 }
 

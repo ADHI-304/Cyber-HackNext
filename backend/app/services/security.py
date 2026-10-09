@@ -118,10 +118,9 @@ def get_current_user_from_token(authorization: Optional[str] = Header(None)) -> 
 
 def get_admin_user(current_user: Dict[str, Any] = Depends(get_current_user_from_token)) -> Dict[str, Any]:
     role = str(current_user.get("role", "user")).lower().strip()
-    username = str(current_user.get("username", "")).lower().strip()
     
-    # Allow admin role OR designated admin username
-    if role != "admin" and not username.startswith("admin"):
+    # Require explicit admin role
+    if role != "admin":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Access denied. Administrator privileges required."

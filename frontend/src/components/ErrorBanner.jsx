@@ -32,10 +32,16 @@ const iconMap = {
 export function ErrorBanner({ errorCode, onPrimaryAction, primaryActionLabel, onClose }) {
   const { prefs, voiceCode, t } = useA11yPrefs();
   const { speak, stop, isSpeaking } = useSpeech();
-  const errorInfo = getErrorMessage(errorCode, prefs.language || 'en');
 
-  const IconComponent = iconMap[errorInfo.icon] || AlertCircle;
-  const fullTextToRead = `${errorInfo.title}. ${errorInfo.plainExplanation} ${errorInfo.nextAction}`;
+  const codeKey = typeof errorCode === 'object' && errorCode !== null ? errorCode.code : errorCode;
+  const defaultInfo = getErrorMessage(codeKey, prefs.language || 'en');
+
+  const title = (typeof errorCode === 'object' && errorCode?.title) || defaultInfo.title;
+  const plainExplanation = (typeof errorCode === 'object' && errorCode?.plainExplanation) || defaultInfo.plainExplanation;
+  const nextAction = (typeof errorCode === 'object' && errorCode?.nextAction) || defaultInfo.nextAction;
+
+  const IconComponent = iconMap[defaultInfo.icon] || AlertCircle;
+  const fullTextToRead = `${title}. ${plainExplanation} ${nextAction}`;
 
   useEffect(() => {
     if (prefs.voiceGuidance && errorCode) {
@@ -59,13 +65,13 @@ export function ErrorBanner({ errorCode, onPrimaryAction, primaryActionLabel, on
           </div>
           <div>
             <h2 className="text-sm font-extrabold text-amber-950 high-contrast:text-amber-300">
-              {errorInfo.title}
+              {title}
             </h2>
             <p className="mt-1 text-xs font-semibold text-slate-800 leading-relaxed high-contrast:text-slate-100">
-              {errorInfo.plainExplanation}
+              {plainExplanation}
             </p>
             <p className="mt-1 text-xs font-medium text-slate-700 leading-relaxed high-contrast:text-slate-200">
-              {errorInfo.nextAction}
+              {nextAction}
             </p>
           </div>
         </div>

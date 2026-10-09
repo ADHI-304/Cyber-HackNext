@@ -58,7 +58,7 @@ export async function sendRegistrationPhoneOtp(phone) {
     if (res) return res;
   }
   await delay(300);
-  return { ok: true, success: true, message: `6-digit verification code sent to ${phone}`, demoCodeHint: '123456' };
+  return { ok: true, success: true, message: `6-digit verification code sent to ${phone}` };
 }
 
 export async function verifyRegistrationPhone(username, phone, otp) {
@@ -96,8 +96,30 @@ export async function register(username, password, phone = '', accessibilityProf
     return { ok: false, errorCode: 'INVALID_CREDENTIALS', data: null };
   }
 
+  const userEmailClean = username.trim().toLowerCase();
+
   if (password.length < 8) {
     return { ok: false, errorCode: 'WEAK_PASSWORD', data: null };
+  }
+
+  const pwdLower = password.trim().toLowerCase();
+  const emailPrefix = userEmailClean.split('@')[0];
+  if (pwdLower === userEmailClean || (emailPrefix.length >= 3 && pwdLower === emailPrefix)) {
+    return { ok: false, errorCode: 'PASSWORD_CONTAINS_EMAIL', data: null };
+  }
+
+  const seenContacts = new Set();
+  for (const c of trustedContacts) {
+    if (c.email && c.email.trim()) {
+      const cEmail = c.email.trim().toLowerCase();
+      if (cEmail === userEmailClean) {
+        return { ok: false, errorCode: 'SELF_TRUSTED_CONTACT_FORBIDDEN', data: null };
+      }
+      if (seenContacts.has(cEmail)) {
+        return { ok: false, errorCode: 'DUPLICATE_TRUSTED_CONTACT', data: null };
+      }
+      seenContacts.add(cEmail);
+    }
   }
 
   mockUsers.set(username, { username, password, phoneNumber: phone, phoneVerified: false, accessibilityProfile, trustedContacts });
@@ -236,8 +258,7 @@ export async function login(username, password) {
     data: {
       username,
       otpRequired: true,
-      expiresInSeconds: 30,
-      demoCodeHint: '123456'
+      expiresInSeconds: 30
     }
   };
 }
@@ -308,8 +329,7 @@ export async function resendOtp(username) {
     errorCode: null,
     data: {
       message: 'New code sent to your registered device',
-      expiresInSeconds: 30,
-      demoCodeHint: '123456'
+      expiresInSeconds: 30
     }
   };
 }
@@ -431,7 +451,7 @@ export async function requestPhoneRecoveryOtp(username = 'user@securebank.com', 
     if (res) return res;
   }
   await delay(300);
-  return { ok: true, success: true, message: `OTP sent to ${phone}`, data: { demoCodeHint: '123456' } };
+  return { ok: true, success: true, message: `OTP sent to ${phone}`, data: {} };
 }
 
 export async function verifyPhoneRecoveryOtp(username = 'user@securebank.com', code) {
@@ -458,7 +478,7 @@ export async function requestEmailRecoveryOtp(email) {
     if (res) return res;
   }
   await delay(300);
-  return { ok: true, success: true, message: `Recovery link sent to ${email}`, data: { demoCodeHint: '123456' } };
+  return { ok: true, success: true, message: `Recovery link sent to ${email}`, data: {} };
 }
 
 export async function verifyEmailRecoveryOtp(email, code) {
@@ -565,3 +585,54 @@ export async function getFrictionStats() {
     }
   };
 }
+
+export async function changePassword(username, currentPassword, newPassword) {
+  if (USE_REAL_BACKEND) {
+    const res = await apiFetch('/api/v1/auth/change-password', {
+      method: 'POST',
+      body: JSON.stringify({ username, currentPassword, newPassword })
+    });
+    if (res) return res;
+  }
+  await delay(300);
+  if (!username || !currentPassword || !newPassword) {
+    return { ok: false, errorCode: 'INVALID_CREDENTIALS', message: 'All fields are required.' };
+  }
+  if (newPassword.length < 8) {
+    return { ok: false, errorCode: 'WEAK_PASSWORD', message: 'New password must be at least 8 characters long.' };
+  }
+  return { ok: true, success: true, message: 'Password updated successfully.' };
+}
+
+export async function updateTrustedContacts(username, trustedContacts) {
+  if (USE_REAL_BACKEND) {
+    const res = await apiFetch('/api/v1/auth/update-trusted-contacts', {
+      method: 'POST',
+      body: JSON.stringify({ username, trustedContacts })
+    });
+    if (res) return res;
+  }
+  await delay(300);
+  return { ok: true, success: true, message: 'Trusted contacts updated successfully.', trustedContacts };
+}
+
+export async function verifyRegistrationTrustedContact(username, contactEmail, otp) {
+  if (USE_REAL_BACKEND) {
+    const res = await apiFetch('/api/v1/auth/verify-registration-trusted-contact', {
+      method: 'POST',
+      body: JSON.stringify({ username, contactEmail, otp })
+    });
+    if (res) return res;
+  }
+  await delay(350);
+  if (otp === '123456' || otp.length === 6) {
+    const usr = mockUsers.get(username);
+    if (usr && usr.trustedContacts && usr.trustedContacts.length > 0) {
+      usr.trustedContacts[0].status = 'approved';
+    }
+    return { ok: true, success: true, message: 'Primary trusted contact verified ✓', contactVerified: true };
+  }
+  return { ok: false, success: false, errorCode: 'OTP_INVALID', message: 'The verification code is incorrect.' };
+}
+
+

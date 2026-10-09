@@ -35,7 +35,7 @@ export function ResetPasswordForm({ onSubmit, isLoading }) {
 
       <div>
         <label htmlFor="new-password" className="block text-sm font-bold text-slate-800 mb-1.5 high-contrast:text-slate-100">
-          New Password
+          New Password <span className="text-rose-500 font-bold ml-0.5" aria-hidden="true">*</span>
         </label>
         <div className="relative">
           <input
@@ -62,7 +62,7 @@ export function ResetPasswordForm({ onSubmit, isLoading }) {
 
       <div>
         <label htmlFor="confirm-password" className="block text-sm font-bold text-slate-800 mb-1.5 high-contrast:text-slate-100">
-          Confirm New Password
+          Confirm New Password <span className="text-rose-500 font-bold ml-0.5" aria-hidden="true">*</span>
         </label>
         <input
           id="confirm-password"

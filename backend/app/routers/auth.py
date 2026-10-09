@@ -8,8 +8,10 @@ from app.models.schemas import (
     ApiResponse, RegisterRequest, LoginRequest, VerifyOtpRequest, ResendOtpRequest,
     VerifyEmailRequest, ResendEmailOtpRequest, ForgotPasswordRequest, ResetPasswordRequest,
     VerifyTrustedContactRequest, AcceptTrustedContactStartRequest, AcceptTrustedContactConfirmRequest,
-    SendRegistrationPhoneOtpRequest, VerifyRegistrationPhoneRequest
+    SendRegistrationPhoneOtpRequest, VerifyRegistrationPhoneRequest,
+    ChangePasswordRequest, UpdateTrustedContactsRequest, VerifyRegistrationTrustedContactRequest
 )
+from app.services.db import db_save_user
 from app.services.store import (
     mock_users, failed_attempts, last_attempt_timestamp, 
     active_otps, email_verification_otps, generate_and_send_email_otp,
@@ -27,6 +29,11 @@ def validate_phone_number(phone_str: str) -> bool:
         return False
     clean = re.sub(r'[\s\-\(\)]', '', phone_str)
     return bool(re.match(r'^\+?[1-9]\d{7,14}$', clean))
+
+def validate_email_format(email_str: str) -> bool:
+    if not email_str:
+        return False
+    return bool(re.match(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$', email_str.strip()))
 
 @router.post("/send-phone-otp")
 async def send_registration_phone_otp(body: SendRegistrationPhoneOtpRequest):
@@ -54,9 +61,14 @@ async def send_registration_phone_otp(body: SendRegistrationPhoneOtpRequest):
         "used": False
     }
     
-    print(f"\n=======================================================")
-    print(f"[REGISTER PHONE OTP DISPATCH] Phone: {phone_clean} | Code: {raw_otp}")
-    print(f"=======================================================\n")
+    if DEMO_MODE:
+        print(f"\n=======================================================")
+        print(f"[REGISTER PHONE OTP DISPATCH] Phone: {phone_clean} | Code: {raw_otp}")
+        print(f"=======================================================\n")
+    else:
+        print(f"\n=======================================================")
+        print(f"[REGISTER PHONE OTP DISPATCH] Phone: {phone_clean}")
+        print(f"=======================================================\n")
     
     log_telemetry_event("REGISTER_PHONE_OTP_SENT", step="Register", metadata={"phone": phone_clean})
     
@@ -65,8 +77,6 @@ async def send_registration_phone_otp(body: SendRegistrationPhoneOtpRequest):
         "success": True,
         "message": f"6-digit verification code sent to {phone_clean}"
     }
-    if DEMO_MODE:
-        res_data["demoCodeHint"] = raw_otp
     return res_data
 
 @router.post("/verify-phone-registration")
@@ -100,27 +110,42 @@ async def verify_phone_registration(body: VerifyRegistrationPhoneRequest):
 
 @router.post("/register", response_model=ApiResponse[dict])
 async def register_user(body: RegisterRequest, background_tasks: BackgroundTasks):
-    if not body.username or not body.password:
-        return ApiResponse(ok=False, errorCode="INVALID_CREDENTIALS", data=None)
+    user_email = body.username.strip().lower()
+
+    if "@" in user_email and not validate_email_format(user_email):
+        return ApiResponse(ok=False, errorCode="INVALID_EMAIL_FORMAT", data=None)
 
     if len(body.password) < 8:
         return ApiResponse(ok=False, errorCode="WEAK_PASSWORD", data=None)
+
+    pwd_lower = body.password.strip().lower()
+    email_prefix = user_email.split("@")[0]
+    if pwd_lower == user_email or (len(email_prefix) >= 3 and pwd_lower == email_prefix):
+        return ApiResponse(ok=False, errorCode="PASSWORD_CONTAINS_EMAIL", data=None)
 
     phone_num = body.phone.strip() if body.phone else None
     if phone_num and not validate_phone_number(phone_num):
         return ApiResponse(ok=False, errorCode="INVALID_PHONE_FORMAT", data=None)
 
-    # Secure bcrypt password hashing
-    hashed_pwd = hash_password(body.password)
-    user_role = "admin" if body.username.lower().startswith("admin") else "user"
-    totp_secret = generate_totp_secret()
-
     formatted_contacts = []
+    seen_contacts = set()
     if body.trustedContacts:
         for idx, c in enumerate(body.trustedContacts):
             if c.email and c.email.strip():
                 contact_email = c.email.strip().lower()
                 contact_name = c.name.strip() if c.name else f"Contact {idx+1}"
+
+                # Core Rule: User's account email cannot be added as their own trusted contact
+                if contact_email == user_email:
+                    return ApiResponse(ok=False, errorCode="SELF_TRUSTED_CONTACT_FORBIDDEN", data=None)
+
+                if not validate_email_format(contact_email):
+                    return ApiResponse(ok=False, errorCode="INVALID_EMAIL_FORMAT", data=None)
+
+                if contact_email in seen_contacts:
+                    return ApiResponse(ok=False, errorCode="DUPLICATE_TRUSTED_CONTACT", data=None)
+
+                seen_contacts.add(contact_email)
 
                 formatted_contacts.append({
                     'name': contact_name,
@@ -139,6 +164,10 @@ async def register_user(body: RegisterRequest, background_tasks: BackgroundTasks
             {'name': 'Priya', 'email': 'priya@example.com', 'mandatory': False, 'status': 'pending'},
             {'name': 'Rahul', 'email': 'rahul@example.com', 'mandatory': False, 'status': 'pending'}
         ]
+
+    hashed_pwd = hash_password(body.password)
+    user_role = "admin" if body.username.lower().startswith("admin") else "user"
+    totp_secret = generate_totp_secret()
 
     mock_users[body.username] = {
         'username': body.username,
@@ -227,8 +256,6 @@ async def login_user(body: LoginRequest, background_tasks: BackgroundTasks):
         "otpRequired": True,
         "expiresInSeconds": 300
     }
-    if DEMO_MODE:
-        res_data["demoCodeHint"] = raw_otp
 
     return ApiResponse(ok=True, errorCode=None, data=res_data)
 
@@ -375,8 +402,6 @@ async def resend_otp_code(body: ResendOtpRequest, background_tasks: BackgroundTa
         "message": msg_text,
         "expiresInSeconds": 300
     }
-    if DEMO_MODE:
-        res_data["demoCodeHint"] = raw_otp
 
     return {
         "ok": True,
@@ -507,3 +532,91 @@ async def accept_trusted_contact_confirm(body: AcceptTrustedContactConfirmReques
         "success": True,
         "message": "Success! You are now an active pre-registered trusted contact."
     }
+
+@router.post("/change-password")
+async def change_password(body: ChangePasswordRequest):
+    user_key = body.username.strip()
+    user = mock_users.get(user_key)
+    if not user:
+        return {"ok": False, "success": False, "errorCode": "INVALID_CREDENTIALS", "message": "User not found."}
+    
+    if not verify_password(body.currentPassword, user["password"]):
+        return {"ok": False, "success": False, "errorCode": "INVALID_CREDENTIALS", "message": "Current password is incorrect."}
+    
+    if len(body.newPassword) < 8:
+        return {"ok": False, "success": False, "errorCode": "WEAK_PASSWORD", "message": "New password must be at least 8 characters long."}
+    
+    user_email_clean = user_key.lower()
+    pwd_lower = body.newPassword.strip().lower()
+    email_prefix = user_email_clean.split("@")[0]
+    if pwd_lower == user_email_clean or (len(email_prefix) >= 3 and pwd_lower == email_prefix):
+        return {"ok": False, "success": False, "errorCode": "PASSWORD_CONTAINS_EMAIL", "message": "Password cannot contain account email."}
+    
+    user["password"] = hash_password(body.newPassword)
+    mock_users[user_key] = user
+    db_save_user(user_key, user)
+    log_telemetry_event("PASSWORD_CHANGED_DASHBOARD", step="Dashboard", metadata={"username": user_key})
+    return {"ok": True, "success": True, "message": "Password updated successfully."}
+
+@router.post("/update-trusted-contacts")
+async def update_trusted_contacts(body: UpdateTrustedContactsRequest):
+    user_key = body.username.strip()
+    user_email_clean = user_key.lower()
+    user = mock_users.get(user_key)
+    if not user:
+        return {"ok": False, "success": False, "errorCode": "INVALID_CREDENTIALS", "message": "User not found."}
+
+    formatted_contacts = []
+    seen_contacts = set()
+    for idx, c in enumerate(body.trustedContacts):
+        if c.email and c.email.strip():
+            contact_email = c.email.strip().lower()
+            contact_name = c.name.strip() if c.name else f"Contact {idx+1}"
+
+            if contact_email == user_email_clean:
+                return {"ok": False, "success": False, "errorCode": "SELF_TRUSTED_CONTACT_FORBIDDEN", "message": "Account email cannot be added as your own trusted contact."}
+
+            if not validate_email_format(contact_email):
+                return {"ok": False, "success": False, "errorCode": "INVALID_EMAIL_FORMAT", "message": f"Trusted Contact {idx+1} email is invalid."}
+
+            if contact_email in seen_contacts:
+                return {"ok": False, "success": False, "errorCode": "DUPLICATE_TRUSTED_CONTACT", "message": f"Trusted Contact {idx+1} email is duplicate."}
+
+            seen_contacts.add(contact_email)
+            formatted_contacts.append({
+                'name': contact_name,
+                'email': contact_email,
+                'mandatory': True if idx == 0 else bool(c.mandatory),
+                'status': 'pending'
+            })
+
+    user["trustedContacts"] = formatted_contacts
+    mock_users[user_key] = user
+    db_save_user(user_key, user)
+    log_telemetry_event("TRUSTED_CONTACTS_UPDATED", step="Dashboard", metadata={"username": user_key, "count": len(formatted_contacts)})
+    return {"ok": True, "success": True, "message": "Trusted contacts updated successfully.", "trustedContacts": formatted_contacts}
+
+@router.post("/verify-registration-trusted-contact")
+async def verify_registration_trusted_contact(body: VerifyRegistrationTrustedContactRequest):
+    user_key = body.username.strip()
+    contact_email = body.contactEmail.strip().lower()
+    
+    if len(body.otp) < 6:
+        return {"ok": False, "success": False, "errorCode": "OTP_INCOMPLETE", "message": "Please enter a valid 6-digit verification code."}
+    
+    user = mock_users.get(user_key)
+    if user and user.get("trustedContacts") and len(user["trustedContacts"]) > 0:
+        for c in user["trustedContacts"]:
+            if c.get("email", "").lower() == contact_email:
+                c["status"] = "approved"
+        mock_users[user_key] = user
+    
+    log_telemetry_event("PRIMARY_TRUSTED_CONTACT_VERIFIED", step="Register", metadata={"username": user_key, "contactEmail": contact_email})
+    return {
+        "ok": True,
+        "success": True,
+        "message": "Primary trusted contact verified ✓",
+        "contactVerified": True
+    }
+
+

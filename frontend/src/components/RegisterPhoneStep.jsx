@@ -84,15 +84,7 @@ export function RegisterPhoneStep({ username, phone, onVerified, onBack }) {
         <div className="space-y-3">
           <OtpInput length={6} value={code} onChange={setCode} onComplete={(val) => handleVerify(val)} />
 
-          <div className="flex items-center justify-between text-xs px-1">
-            <button
-              type="button"
-              onClick={() => setCode('123456')}
-              className="text-[11px] font-bold text-sky-700 bg-sky-50 border border-sky-200 px-2.5 py-1 rounded-lg hover:bg-sky-100"
-            >
-              {t('autoFillDemoCode')}
-            </button>
-
+          <div className="flex items-center justify-end text-xs px-1">
             <button
               type="button"
               disabled={cooldown > 0 || isResending}

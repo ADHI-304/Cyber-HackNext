@@ -17,11 +17,11 @@ export function LoginFormFields({
     <>
       <div>
         <label htmlFor="login-username" className="block text-sm font-bold text-slate-800 mb-1.5 high-contrast:text-slate-100">
-          {t('usernameLabel')}
+          {t('usernameLabel')} <span className="text-rose-500 font-bold ml-0.5" aria-hidden="true">*</span>
         </label>
         <input
           id="login-username"
-          type="text"
+          type="email"
           required
           value={username}
           onChange={(e) => setUsername(e.target.value)}
@@ -33,7 +33,7 @@ export function LoginFormFields({
       <div>
         <div className="flex items-center justify-between mb-1.5 flex-wrap gap-1">
           <label htmlFor="login-password" className="block text-sm font-bold text-slate-800 high-contrast:text-slate-100">
-            {t('passwordLabel')}
+            {t('passwordLabel')} <span className="text-rose-500 font-bold ml-0.5" aria-hidden="true">*</span>
           </label>
           <Link to="/recovery-start" className="text-xs font-semibold text-sky-700 hover:text-sky-900 underline flex items-center gap-1 high-contrast:text-amber-400">
             <HelpCircle className="w-3.5 h-3.5" />

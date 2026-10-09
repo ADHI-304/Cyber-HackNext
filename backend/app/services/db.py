@@ -138,6 +138,30 @@ def init_db():
             ("admin@securebank.com", hash_password("Password123!"), "Admin User", "admin", 1, "+919999999999", 1, "JBSWY3DPEHPK3PXP")
         )
 
+    # Seed default telemetry events if table is empty
+    cursor.execute("SELECT COUNT(*) FROM telemetry_events")
+    if cursor.fetchone()[0] == 0:
+        now_ts = datetime.utcnow().isoformat()
+        seed_events = [
+            ("USER_REGISTERED", "Register", json.dumps({"username": "user@securebank.com", "role": "user"})),
+            ("PHONE_VERIFIED_SUCCESS", "Register", json.dumps({"username": "user@securebank.com", "phone": "+919876543210"})),
+            ("SUCCESSFUL_LOGIN", "Login", json.dumps({"username": "user@securebank.com"})),
+            ("AUTHBUDDY_ACTIVATED", "Login", json.dumps({"mode": "guided"})),
+            ("FORGOT_PASSWORD_INITIATED", "ForgotPassword", json.dumps({"email": "user@securebank.com"})),
+            ("PASSWORD_RESET_SUCCESS", "ResetPassword", json.dumps({"email": "user@securebank.com"})),
+            ("FAILED_LOGIN", "Login", json.dumps({"reason": "Wrong password"})),
+            ("FAILED_OTP_OTP_INVALID", "VerifyOtp", json.dumps({"reason": "Invalid OTP code"})),
+            ("PHONE_RECOVERY_OTP_SENT", "Recovery", json.dumps({"method": "phone"})),
+            ("PHONE_RECOVERY_SUCCESS", "Recovery", json.dumps({"method": "phone"})),
+            ("RECOVERY_STARTED", "Recovery", json.dumps({"contactsCount": 3})),
+            ("TRUSTED_CONTACT_VERIFIED", "TrustedContacts", json.dumps({"contact": "arun@example.com"}))
+        ]
+        for evt_type, evt_step, evt_meta in seed_events:
+            cursor.execute(
+                "INSERT INTO telemetry_events (event_type, step, timestamp, metadata_json) VALUES (?, ?, ?, ?)",
+                (evt_type, evt_step, now_ts, evt_meta)
+            )
+
     conn.commit()
     conn.close()
 

@@ -124,7 +124,7 @@ export function TotpSetup({ totpData, onDone }) {
                       </button>
                     </div>
                     <div className="text-[10px] text-slate-500 font-medium">
-                      Code sent to <span className="font-mono">{c.email}</span> (Demo fallback: <span className="font-mono font-bold text-purple-800">123456</span>)
+                      Code sent to <span className="font-mono">{c.email}</span>
                     </div>
                     {fb && <div className={`text-[11px] font-bold ${fb.type === 'error' ? 'text-rose-600' : 'text-emerald-700'}`}>{fb.text}</div>}
                   </div>
